@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-// Only routes that exist. Donors and Assistant are added as they land --
-// a nav link to a 404 is worse than a missing link.
 const NAV = [
   { href: '/dashboard', label: 'Overview' },
   { href: '/dashboard/donors', label: 'Donors' },
+  { href: '/dashboard/assistant', label: 'Assistant' },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

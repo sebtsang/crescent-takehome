@@ -606,3 +606,93 @@ that must not do money maths — the browser is a client too.
 Known gaps: `/dashboard/campaigns/[id]`, `/dashboard/donors` and
 `/dashboard/assistant` are not built. Nav links only routes that exist — a link
 to a 404 is worse than a missing link.
+
+---
+
+## 15. The assistant
+
+**Six tools, split by result shape** (`convex/agent/tools.ts`): `list_campaigns`,
+`get_fundraising_stats`, `get_campaign_breakdown`, `get_donation_timeseries`,
+`list_top_donors`, `list_recent_donations`. Every `run` is a thin
+`ctx.runQuery` to the *same* query the dashboard calls.
+
+Convex actions cannot touch `ctx.db`, so this is enforced by the platform rather
+than by discipline: the agent has no way to reach a donation row. It chooses
+which question to ask; the server computes every number.
+
+**Manual tool loop, not the SDK tool runner.** Each tool call and result is
+persisted to `chatMessages` as it happens — the brief requires that, and it also
+gives the UI live progress without implementing streaming, since the client
+subscribes to the messages query and tool cards appear while the model is still
+working. The runner would have made per-call persistence awkward for no gain.
+
+**`thinking` is omitted** rather than set to `adaptive`: Opus 5 runs adaptive by
+default, and SDK 0.65's types predate the `'adaptive'` literal.
+
+### Anti-hallucination, structurally rather than by prompting
+
+- The system prompt contains **no figures**, so there is nothing to parrot.
+- Tool results are self-describing: `coverage` states the dataset bounds, so an
+  empty July returns "0 rows, data covers 2026-01-01 → 2026-06-29" instead of a
+  bare zero. The honest answer is the easy answer.
+- Money crosses as `{cents, formatted}`. The model is told to quote `formatted`
+  verbatim and may compare `cents` but never do arithmetic on it.
+- `additionalProperties: false` everywhere, so the model cannot invent an
+  argument — most importantly a `statuses` filter, which must never exist. A test
+  asserts the string "statuses" appears nowhere in the schemas.
+- Tool failures return `is_error` to the model rather than throwing, so it can
+  correct its arguments or say it cannot answer.
+
+### Schema drift — the risk D3 accepted, now mitigated
+
+Hand-written schemas can drift from the Convex validators they mirror. Schemas
+live in `convex/agent/schemas.ts` with no Convex imports so they are directly
+testable, and `tests/agent-schemas.test.ts` pins the range presets against
+`RANGE_PRESETS` and the sort enums against the reporting constants. Drift now
+fails a test instead of surfacing as an agent that quietly cannot express a range.
+
+### Privacy
+
+`list_top_donors` projects `email` away before the result is returned. Tool
+results are persisted verbatim in `chatMessages`, which is a durable store with
+no auth in front of it, and no question the assistant answers needs an email.
+The donors dashboard page still shows emails — it reads the query directly and
+renders them ephemerally.
+
+### Debuggability
+
+Every tool result carries `_meta {tool, durationMs}`, and the UI renders each
+call as an expandable card showing arguments and full result. That makes a wrong
+number attributable at a glance: wrong arguments is a model error, right
+arguments with wrong figures is a tool error, and right figures with wrong prose
+is a presentation error — three different fixes in three different files.
+
+### Setup required
+
+The assistant needs a key on the **Convex deployment** (not `.env.local` — the
+action runs server-side):
+
+```
+npx convex env set ANTHROPIC_API_KEY <key>
+```
+
+Without it the agent degrades gracefully: it appends a message naming the missing
+variable and the command to fix it, rather than throwing. That path is verified;
+the model path is not (see §16).
+
+---
+
+## 16. Not yet verified
+
+- **The assistant's actual answers.** No `ANTHROPIC_API_KEY` has been set on the
+  deployment, so the model has never run. Everything around it is verified —
+  thread creation, message persistence, the action dispatching, tool-call
+  rendering, and the missing-key path — but no real answer has been produced or
+  checked against BASELINE.md §"Answers to the five required agent questions".
+- **Mobile/responsive layout.** Built with responsive classes, only checked at
+  1280px.
+- **Accessibility** beyond focus rings, ARIA labels on controls, and semantic
+  tables. No screen-reader pass.
+- **Concurrency.** Two rapid submissions in one thread are not guarded
+  server-side; the UI disables the input while busy, which is a client-side
+  guard only.
