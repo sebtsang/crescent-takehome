@@ -71,32 +71,19 @@ export const listByCampaign = query({
 });
 
 /**
- * Implement these if your brief covers reporting.
+ * Reporting lives in `convex/reporting.ts`, which wraps the pure aggregation in
+ * `convex/lib/`. These two are re-exported here because the brief names these
+ * paths -- they are the SAME function objects, not parallel implementations.
  *
- * `listByCampaign` above collects every row. That is fine at 400 donations and
- * a genuine problem at 400,000: it is the shape of bug that passes review,
- * ships, and falls over on your largest customer. Decide what to do about it
- * and write your reasoning in NOTES.md.
+ * On `listByCampaign` above collecting every row, and why these queries do the
+ * same: `computeStats` and `computeTimeseries` take the UNSCOPED rows so that
+ * `coverage` can report the dataset's real bounds even when the scope matches
+ * nothing. That is what lets an empty period answer "$0.00, and the most recent
+ * gift is 2026-06-29" rather than a bare zero the caller has to interpret. An
+ * indexed range read returns nothing for an empty period, so coverage would go
+ * null and that guarantee would vanish silently.
  *
- * Things worth getting right, all of which we will check:
- *   - Only `succeeded` money counts as raised. `pending`, `failed` and
- *     `refunded` rows exist in the seed precisely to catch a naive sum.
- *   - `amountCents` is the net to the org. `feeCoveredCents` is extra the
- *     donor paid on top. Total charged is the sum; raised is not.
- *   - A donor is an EMAIL, not a row. The seed contains repeat givers, and
- *     "unique donors" must not equal "donation count".
- *   - Time buckets need a timezone. Say which one you picked and why.
+ * Correct and instant at 283 rows; it will not survive hundreds of thousands.
+ * NOTES.md records the ceiling and what production would do instead.
  */
-export const stats = query({
-  args: {},
-  handler: async (_ctx) => {
-    throw new Error('Not implemented');
-  },
-});
-
-export const timeseries = query({
-  args: {},
-  handler: async (_ctx) => {
-    throw new Error('Not implemented');
-  },
-});
+export { stats, timeseries } from './reporting';

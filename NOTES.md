@@ -420,6 +420,8 @@ expandable card in the UI. A wrong number is then attributable at a glance: wron
 | D3 | **No `convexToJsonSchema()`. Hand-maintain the tool schemas.** | Six small schemas. The generator is the better call at scale; at this size it is infrastructure that has to be explained in a walkthrough without earning its keep. Accepted cost: the tool schema and the Convex validator can drift, so they must be edited together. |
 | D4 | **No streaming until all required functionality, correctness, tests, and UI are complete.** | The brief permits it: "streaming if you can, not at the cost of correctness." Persist-and-subscribe (§9.6) remains the chosen approach if time allows. |
 | D5 | **Keep the shared reporting architecture and result-shape tool design** (§9). | Unchanged. |
+| D6 | **Every reporting query collects the whole `donations` table. No indexed narrowing.** | See §12 — this is a correctness decision, not a simplicity concession. |
+| D7 | **A donor is anonymous only if *every* gift was.** | A deliberate product assumption, not an inherent truth. See §13. |
 
 ### D2 follow-up: draft-campaign inspection
 
@@ -477,3 +479,79 @@ from scratch as a concise engineering document covering only:
 
 Explicitly **not** carried over: the chronological reasoning, setup diary, prompt
 history, and the long tail of every edge case discovered along the way.
+
+---
+
+## 12. Read strategy: why full-collect, and where the ceiling is
+
+Every query in `convex/reporting.ts` calls `.collect()` on the whole `donations`
+table. The `by_campaign` and `by_created` indexes exist and are deliberately
+unused.
+
+**This is a correctness decision.** `computeStats` and `computeTimeseries` take
+the *unscoped* rows so that `coverage` can report the dataset's true bounds even
+when the scope matches nothing. That is the mechanism that lets "how much did we
+raise last month?" answer **"$0.00, and the most recent gift is 2026-06-29"**
+instead of a bare zero the caller has to interpret — the single most important
+anti-hallucination property in the design.
+
+An indexed range read for July returns **zero rows**, so `coverage` would report
+`null` bounds and that guarantee would disappear silently. Restoring it needs a
+second query purely for dataset bounds, which means two sources of truth for
+"what is the dataset" — precisely the drift this architecture exists to prevent.
+The optimisation would have bought nothing measurable at 283 rows and cost the
+property the whole design is built around.
+
+### What this will not survive
+
+At 283 rows this is instant. It will not survive hundreds of thousands. And it
+does not degrade gracefully into slowness: Convex enforces a document-read limit,
+so a large table makes these queries **fail outright** rather than return a wrong
+number. That is the better failure mode, but it is still a hard ceiling.
+
+The org-wide "all time" case is the real wall. Campaign- and date-scoped reads
+can be narrowed with the existing indexes; an unscoped org total has nothing to
+narrow on and must read everything.
+
+### What production would do
+
+1. **Indexed reads** for the scoped cases (`by_campaign`, `by_created`), with
+   dataset bounds served by a separate cheap query — two `first()` reads against
+   `by_created` — so `coverage` survives.
+2. **Precomputed rollups** for the unscoped totals: a denormalised per-campaign
+   and per-period aggregate maintained on write, or Convex's aggregate component.
+3. **Reconciliation** for those rollups. A rollup that drifts from the donations
+   table is a second source of truth for money, so it needs a periodic job that
+   recomputes from source and alerts on mismatch. Without that, the rollup is a
+   liability rather than an optimisation.
+
+None of that is here, deliberately: it is unobservable at this scale, and it
+would have come out of the time the assistant needs.
+
+---
+
+## 13. The anonymity rule is a product assumption
+
+`computeDonorRollup` treats a donor as anonymous **only if every one of their
+gifts was anonymous**. Two seeded donors are mixed — `wei.kim` (1 anonymous of
+13) and `amina.haddad` (2 of 11) — and both resolve to *named*.
+
+**This is a judgment call, not a fact the data implies.** The schema stores
+`anonymous` per gift and says nothing about what that means for a donor. The rule
+here reads it as *"this gift should not be attributed publicly"*, so a donor who
+has elsewhere attached their name has not asked to be hidden from staff.
+
+A reasonable organisation could choose differently:
+
+| alternative | argument for it | why not chosen |
+|---|---|---|
+| **Any anonymous gift hides the donor everywhere** | Strictest reading of donor intent; safest under a privacy complaint | Erases 2 of the top 2 donors from the donors table, making the org's most important relationships invisible to the staff who steward them |
+| **No donor-level answer; only per-gift display** | Avoids inventing a rule the data does not contain | The donors view and "top 10 donors" both *require* a per-donor answer; declining to have one means not building the feature |
+
+Whichever is right depends on the nonprofit's donor-privacy policy and possibly
+its jurisdiction. It should be an **org setting**, not a hard-coded constant.
+
+Note also that the rule is **scoped to per-donor rollups only**.
+`recentDonations` redacts per *gift* — a feed of individual gifts hides the name
+on any gift marked anonymous, regardless of what that donor did elsewhere. The
+two answers deliberately differ because they answer different questions.
