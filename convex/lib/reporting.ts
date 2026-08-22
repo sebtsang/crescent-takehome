@@ -27,6 +27,7 @@ export type DonationLike = {
   amountCents: number;
   feeCoveredCents: number;
   status: DonationStatus;
+  frequency: DonationFrequency;
   donorEmail: string;
   campaignId: string;
   createdAt: number;
@@ -200,3 +201,143 @@ export function computeRaisedCents(
 }
 
 export { uniqueDonorCount };
+
+// ── Breakdown ────────────────────────────────────────────────────────────────
+
+export const DONATION_FREQUENCIES = ['one_time', 'monthly'] as const;
+export type DonationFrequency = (typeof DONATION_FREQUENCIES)[number];
+
+export const BREAKDOWN_DIMENSIONS = ['campaign', 'frequency'] as const;
+export type BreakdownDimension = (typeof BREAKDOWN_DIMENSIONS)[number];
+
+export const BREAKDOWN_SORTS = ['raised', 'donationCount', 'uniqueDonorCount'] as const;
+export type BreakdownSort = (typeof BREAKDOWN_SORTS)[number];
+
+/** Structural, so both `Doc<'campaigns'>` and test fixtures satisfy it. */
+export type CampaignLike = {
+  _id: string;
+  name: string;
+  slug: string;
+  status: 'draft' | 'active' | 'ended';
+  goalCents?: number;
+};
+
+export type BreakdownGroup = {
+  key: string;
+  label: string;
+  raised: MoneyFigure;
+  donationCount: number;
+  uniqueDonorCount: number;
+  averageGift: MoneyFigure | null;
+  feesCovered: MoneyFigure;
+  charged: MoneyFigure;
+  /** share of the scoped total; null when the scoped total is zero */
+  shareOfTotalPct: number | null;
+  /** campaign dimension only */
+  campaignStatus?: CampaignLike['status'];
+  goal?: MoneyFigure | null;
+  /**
+   * TRUE percent, uncapped -- two seeded campaigns are over goal (171.8%, 199.0%).
+   * Clamping belongs to the progress bar, not to the number. null when the
+   * campaign has no goal, so nothing ever divides by zero or renders Infinity.
+   */
+  goalProgressPct?: number | null;
+};
+
+/** One decimal place, computed from a ratio so the rounding happens once. */
+function toPercent(numerator: number, denominator: number): number | null {
+  if (denominator <= 0) return null;
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function summarize(rows: readonly DonationLike[]) {
+  const raisedCents = sumCents(rows.map((r) => r.amountCents));
+  const feesCents = sumCents(rows.map((r) => r.feeCoveredCents));
+  return {
+    raised: money(raisedCents),
+    donationCount: rows.length,
+    uniqueDonorCount: uniqueDonorCount(rows),
+    averageGift: optionalMoney(averageCents(raisedCents, rows.length)),
+    feesCovered: money(feesCents),
+    charged: money(raisedCents + feesCents),
+  };
+}
+
+/**
+ * Groups succeeded gifts by campaign or frequency.
+ *
+ * Groups are built from the CATALOG (the campaign list, or the fixed frequency
+ * enum), not from the donations. Grouping over the rows would silently drop any
+ * campaign with no gifts -- and "this campaign has raised nothing" is exactly
+ * the fact a fundraising dashboard must not hide.
+ *
+ * Ordering is fully deterministic: the sort metric descending, then label, then
+ * key. Ties are extremely common in this dataset, and an unstable order would
+ * let the dashboard and the agent disagree about rank while both are "correct".
+ */
+export function computeBreakdown(
+  allRows: readonly DonationLike[],
+  campaigns: readonly CampaignLike[],
+  options: {
+    dimension: BreakdownDimension;
+    scope?: DonationScope;
+    sortBy?: BreakdownSort;
+  }
+): { dimension: BreakdownDimension; sortBy: BreakdownSort; groups: BreakdownGroup[] } {
+  const scope = options.scope ?? FULL_SCOPE;
+  const sortBy = options.sortBy ?? 'raised';
+
+  const inScope = filterDonationsByScope(allRows, scope);
+  const succeeded = partitionByStatus(inScope).succeeded;
+  const scopedTotalCents = sumCents(succeeded.map((r) => r.amountCents));
+
+  const groups: BreakdownGroup[] = [];
+
+  if (options.dimension === 'campaign') {
+    // Respect an explicit campaign scope; otherwise every known campaign.
+    const requested = scope.campaignIds ? new Set(scope.campaignIds) : null;
+    const visible = requested ? campaigns.filter((c) => requested.has(c._id)) : campaigns;
+
+    for (const campaign of visible) {
+      const rows = succeeded.filter((r) => r.campaignId === campaign._id);
+      const summary = summarize(rows);
+      const hasGoal = typeof campaign.goalCents === 'number' && campaign.goalCents > 0;
+      groups.push({
+        key: campaign._id,
+        label: campaign.name,
+        ...summary,
+        shareOfTotalPct: toPercent(summary.raised.cents, scopedTotalCents),
+        campaignStatus: campaign.status,
+        goal: hasGoal ? money(campaign.goalCents as number) : null,
+        goalProgressPct: hasGoal
+          ? toPercent(summary.raised.cents, campaign.goalCents as number)
+          : null,
+      });
+    }
+  } else {
+    for (const frequency of DONATION_FREQUENCIES) {
+      const rows = succeeded.filter((r) => r.frequency === frequency);
+      const summary = summarize(rows);
+      groups.push({
+        key: frequency,
+        label: frequency === 'one_time' ? 'One-time' : 'Monthly',
+        ...summary,
+        shareOfTotalPct: toPercent(summary.raised.cents, scopedTotalCents),
+      });
+    }
+  }
+
+  const metric = (g: BreakdownGroup) =>
+    sortBy === 'raised'
+      ? g.raised.cents
+      : sortBy === 'donationCount'
+        ? g.donationCount
+        : g.uniqueDonorCount;
+
+  groups.sort(
+    (a, b) =>
+      metric(b) - metric(a) || a.label.localeCompare(b.label) || a.key.localeCompare(b.key)
+  );
+
+  return { dimension: options.dimension, sortBy, groups };
+}
