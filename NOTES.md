@@ -555,3 +555,54 @@ Note also that the rule is **scoped to per-donor rollups only**.
 `recentDonations` redacts per *gift* — a feed of individual gifts hides the name
 on any gift marked anonymous, regardless of what that donor did elsewhere. The
 two answers deliberately differ because they answer different questions.
+
+---
+
+## 14. Dashboard UI
+
+Visual reference: the Polarity style guide. Tokens taken verbatim — light
+`#FEFEFE`/`#F2F2F2`/`#E6E6E6`/`#000614`/`#22445C`, dark `#0E0E0E`/`#171717`/
+`#262626`/`#FEFEFE`/`#7BA0BC`. `rounded-sm`, 1px borders, no shadows,
+sharp-cornered uppercase controls, `text-xs font-semibold uppercase
+tracking-wider` eyebrows, 2px focus ring at offset 2.
+
+**Where I deviated, and why.**
+
+| deviation | reason |
+|---|---|
+| "Cursor Gothic" → **Inter** | Not publicly distributed. Inter is the nearest grotesque that holds the reference's tight negative tracking and ships real tabular figures. |
+| Stat numbers `3rem`→`1.75rem` | The guide sizes stats for a marketing hero. Four KPI cards at 3rem is a billboard, not a dashboard, and the request explicitly ruled out oversized type. |
+| Added `--grid`, `--bar-muted`, `--surface-raised`, status tones | A dashboard needs states a marketing site never had. Derived from the palette, not invented alongside it. |
+
+**Bars, not a line — a correctness argument, not a style one.** 47 of the 180
+days have no succeeded gift. A line chart interpolates straight through them,
+drawing a steady climb across a fortnight where nothing arrived. Bars leave the
+gap visible. This is the same reason `computeTimeseries` zero-fills; the chart
+would throw that guarantee away by smoothing. Empty buckets render as a 1px
+baseline tick so a gap reads as *zero*, not as *missing*.
+
+**Default range is `all_time`.** The data ends 2026-06-29 and "today" is well
+past it, so a conventional 30-day default renders an empty dashboard that reads
+as a broken build. The header prints the requested window *and* the dataset
+coverage (`2026-07-24 → 2026-08-22 · data covers 2026-01-01 → 2026-06-29 · UTC`),
+so an empty result is self-explaining — the same principle as `coverage` in the
+tool payloads.
+
+**No layout shift.** Convex `useQuery` returns `undefined` on first render, so
+`{data && <X/>}` collapses a card to zero height and snaps it open. Every
+data-bearing component reserves its final height: `Figure` renders a skeleton of
+identical dimensions, KPI cards carry a fixed-height note row even when the note
+is empty, tables have `min-h-[16rem]`, and the chart's hover readout is a
+fixed-height row rather than a floating tooltip. Skeletons are not animated.
+
+**Money is never formatted client-side.** `recentDonations` returns
+`{cents, formatted}` from the server's `formatCents`. An early draft had a local
+`formatCents` in the component; it was removed. The LLM is not the only client
+that must not do money maths — the browser is a client too.
+
+**Goal bars clamp at 100%; the number does not.** Two campaigns are over goal
+(171.8%, 199.0%). A campaign with no goal renders "No goal", never `0%`.
+
+Known gaps: `/dashboard/campaigns/[id]`, `/dashboard/donors` and
+`/dashboard/assistant` are not built. Nav links only routes that exist — a link
+to a 404 is worse than a missing link.

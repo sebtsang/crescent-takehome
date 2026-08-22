@@ -2,5 +2,91 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-body { background: #fafafa; color: #18181b; }
+/*
+ * Tokens taken from the Polarity style guide.
+ * "Cursor Gothic" is not publicly distributed; Inter is the substitute -- a
+ * grotesque that holds the reference's tight negative tracking and ships real
+ * tabular figures, which matter more here than they do on a marketing page.
+ */
+:root {
+  color-scheme: light;
+
+  --bg: #fefefe;
+  --surface: #f2f2f2;
+  --border: #e6e6e6;
+  --txt: #000614;
+  --txt2: #1a1a1a;
+  --txt3: #2e2e2e;
+  --accent: #22445c;
+  --accent-hover: #163041;
+
+  /* Derived, not in the guide: a dashboard needs states the marketing site never had. */
+  --surface-raised: #ffffff;
+  --grid: #ebebeb;
+  --bar: #22445c;
+  --bar-muted: #c8d2da;
+  --positive: #22445c;
+  --warn: #8a6d1f;
+  --danger: #8a2f2f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #0e0e0e;
+    --surface: #171717;
+    --border: #262626;
+    --txt: #fefefe;
+    --txt2: #a6a6a6;
+    --txt3: #6e6e6e;
+    --accent: #7ba0bc;
+    --accent-hover: #9db8cd;
+
+    --surface-raised: #1f1f1f;
+    --grid: #222222;
+    --bar: #7ba0bc;
+    --bar-muted: #33414b;
+    --positive: #7ba0bc;
+    --warn: #c9a94e;
+    --danger: #c97b7b;
+  }
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--txt);
+}
+
+body {
+  /* Tabular figures everywhere by default: a money column that shifts as digits
+     change is the single most distracting thing a finance UI can do. */
+  font-feature-settings: 'tnum' 1, 'cv05' 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The guide's focus treatment: 2px ring, offset 2. */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* Eyebrow -- the guide's one distinctive label style, used for every
+     card title and column header so the hierarchy stays flat and quiet. */
+  .eyebrow {
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.08em];
+    color: var(--txt3);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    @apply rounded-sm;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}

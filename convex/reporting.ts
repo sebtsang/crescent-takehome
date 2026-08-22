@@ -16,6 +16,7 @@ import {
 } from './lib/reporting';
 import { RANGE_PRESETS, resolveRange, type RangeSpec } from './lib/time';
 import { partitionByStatus } from './lib/status';
+import { formatCents } from './lib/money';
 
 /**
  * Reporting queries. Thin wrappers around the pure functions in lib/ -- this is
@@ -148,8 +149,8 @@ export const recentDonations = query({
     );
     return {
       donations: succeeded.slice(0, limit).map((d) => ({
-        amountCents: d.amountCents,
-        feeCoveredCents: d.feeCoveredCents,
+        amount: { cents: d.amountCents, formatted: formatCents(d.amountCents) },
+        feeCovered: { cents: d.feeCoveredCents, formatted: formatCents(d.feeCoveredCents) },
         frequency: d.frequency,
         campaignId: d.campaignId,
         createdAt: d.createdAt,
