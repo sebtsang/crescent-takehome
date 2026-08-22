@@ -12,9 +12,12 @@
 
 import { averageCents, formatCents, sumCents } from './money.ts';
 import {
+  bucketKey,
+  enumerateBuckets,
   isWithinRange,
   REPORTING_TIMEZONE,
   UNBOUNDED_RANGE,
+  type Granularity,
   type ResolvedRange,
 } from './time.ts';
 import { countsAsRaised, partitionByStatus, type DonationStatus } from './status.ts';
@@ -340,4 +343,115 @@ export function computeBreakdown(
   );
 
   return { dimension: options.dimension, sortBy, groups };
+}
+
+// ── Timeseries ───────────────────────────────────────────────────────────────
+
+export type TimeseriesBucket = {
+  key: string;
+  startISO: string;
+  raised: MoneyFigure;
+  donationCount: number;
+  /**
+   * Donors unique WITHIN this bucket. These deliberately do not sum to the
+   * period total -- a donor giving in March and April is one person overall but
+   * counted in both buckets. Summing this column is always wrong.
+   */
+  uniqueDonorCount: number;
+  /** Running total across the returned buckets, for a progress-to-goal line. */
+  cumulativeRaised: MoneyFigure;
+};
+
+export type TimeseriesResult = {
+  granularity: Granularity;
+  timezone: string;
+  buckets: TimeseriesBucket[];
+  totalRaised: MoneyFigure;
+  /** Buckets containing no succeeded gifts. Surfaced so a flat chart is explicable. */
+  emptyBucketCount: number;
+  coverage: StatsResult['coverage'];
+};
+
+/**
+ * Bucketed money over time, with every empty bucket present.
+ *
+ * When the scope has no explicit range, the window is derived from the SCOPED
+ * rows' own first and last gift, so "all time" on a campaign page means that
+ * campaign's lifetime rather than the whole dataset's. With an explicit range,
+ * the range wins outright -- including when it contains nothing, which is how a
+ * legitimately empty period stays visible instead of collapsing to no chart.
+ */
+export function computeTimeseries(
+  allRows: readonly DonationLike[],
+  options: {
+    granularity: Granularity;
+    scope?: DonationScope;
+  }
+): TimeseriesResult {
+  const scope = options.scope ?? FULL_SCOPE;
+  const { granularity } = options;
+
+  const inScope = filterDonationsByScope(allRows, scope);
+  const succeeded = partitionByStatus(inScope).succeeded;
+
+  const range = scope.range ?? UNBOUNDED_RANGE;
+  let startMs = range.startMs;
+  let endMs = range.endMs;
+
+  if (startMs === null || endMs === null) {
+    const timestamps = succeeded.map((r) => r.createdAt);
+    if (timestamps.length === 0) {
+      startMs = null;
+      endMs = null;
+    } else {
+      // +1ms so the final gift's own bucket is included by the exclusive bound.
+      if (startMs === null) startMs = Math.min(...timestamps);
+      if (endMs === null) endMs = Math.max(...timestamps) + 1;
+    }
+  }
+
+  const skeleton =
+    startMs === null || endMs === null ? [] : enumerateBuckets(startMs, endMs, granularity);
+
+  const grouped = new Map<string, DonationLike[]>();
+  for (const row of succeeded) {
+    const key = bucketKey(row.createdAt, granularity);
+    const existing = grouped.get(key);
+    if (existing) existing.push(row);
+    else grouped.set(key, [row]);
+  }
+
+  let running = 0;
+  let emptyBucketCount = 0;
+  const buckets: TimeseriesBucket[] = skeleton.map(({ key, startMs: bucketStart }) => {
+    const rows = grouped.get(key) ?? [];
+    if (rows.length === 0) emptyBucketCount += 1;
+    const raisedCents = sumCents(rows.map((r) => r.amountCents));
+    running += raisedCents;
+    return {
+      key,
+      startISO: new Date(bucketStart).toISOString(),
+      raised: money(raisedCents),
+      donationCount: rows.length,
+      uniqueDonorCount: uniqueDonorCount(rows),
+      cumulativeRaised: money(running),
+    };
+  });
+
+  const allTimestamps = allRows.map((r) => r.createdAt);
+
+  return {
+    granularity,
+    timezone: REPORTING_TIMEZONE,
+    buckets,
+    totalRaised: money(sumCents(succeeded.map((r) => r.amountCents))),
+    emptyBucketCount,
+    coverage: {
+      totalRowsInDataset: allRows.length,
+      datasetMinISO:
+        allTimestamps.length === 0 ? null : new Date(Math.min(...allTimestamps)).toISOString(),
+      datasetMaxISO:
+        allTimestamps.length === 0 ? null : new Date(Math.max(...allTimestamps)).toISOString(),
+    },
+  };
 }

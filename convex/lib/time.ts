@@ -171,3 +171,43 @@ export function bucketKey(ms: number, granularity: Granularity): string {
   const daysSinceMonday = (weekday + 6) % 7;
   return new Date(dayStart - daysSinceMonday * DAY_MS).toISOString().slice(0, 10);
 }
+
+/** Start of the bucket that `ms` falls into, in UTC. */
+export function bucketStartMs(ms: number, granularity: Granularity): number {
+  if (granularity === 'month') return startOfUtcMonth(ms);
+  const dayStart = startOfUtcDay(ms);
+  if (granularity === 'day') return dayStart;
+  const weekday = new Date(dayStart).getUTCDay(); // 0=Sunday
+  return dayStart - ((weekday + 6) % 7) * DAY_MS;
+}
+
+/** Start of the following bucket. Months advance by calendar, not by 30 days. */
+export function nextBucketMs(bucketStart: number, granularity: Granularity): number {
+  if (granularity === 'day') return bucketStart + DAY_MS;
+  if (granularity === 'week') return bucketStart + 7 * DAY_MS;
+  return addUtcMonths(bucketStart, 1);
+}
+
+/**
+ * Every bucket between the bounds, INCLUDING empty ones.
+ *
+ * Zero-filling is the whole point: 44 of the 180 seeded days have no donations,
+ * and a chart built only from buckets that contain rows silently closes those
+ * gaps, turning a quiet week into a continuous line and misreporting the trend.
+ *
+ * `endMsExclusive` follows the half-open range convention used everywhere else.
+ */
+export function enumerateBuckets(
+  startMs: number,
+  endMsExclusive: number,
+  granularity: Granularity
+): Array<{ key: string; startMs: number }> {
+  const buckets: Array<{ key: string; startMs: number }> = [];
+  if (!(endMsExclusive > startMs)) return buckets;
+  let cursor = bucketStartMs(startMs, granularity);
+  while (cursor < endMsExclusive) {
+    buckets.push({ key: bucketKey(cursor, granularity), startMs: cursor });
+    cursor = nextBucketMs(cursor, granularity);
+  }
+  return buckets;
+}
