@@ -540,6 +540,13 @@ export function computeDonorRollup(
     limit?: number;
     /** e.g. 2 to answer "how many people gave more than once?" */
     minGiftCount?: number;
+    /**
+     * Case-insensitive substring match on display name or email. Applied
+     * server-side so a search never means "ship every donor to the client and
+     * filter there". Matches the RESOLVED display name, so a fully anonymous
+     * donor cannot be found by typing the name hidden behind the label.
+     */
+    search?: string;
   } = {}
 ): DonorRollupResult {
   const scope = options.scope ?? FULL_SCOPE;
@@ -581,12 +588,21 @@ export function computeDonorRollup(
     return Date.parse(d.firstGiftISO);
   };
 
-  rollups.sort((a, b) => metric(b) - metric(a) || a.email.localeCompare(b.email));
+  const needle = options.search?.trim().toLowerCase();
+  const matched = needle
+    ? rollups.filter(
+        (d) =>
+          d.displayName.toLowerCase().includes(needle) ||
+          (!d.isAnonymous && d.email.includes(needle))
+      )
+    : rollups;
+
+  matched.sort((a, b) => metric(b) - metric(a) || a.email.localeCompare(b.email));
 
   return {
-    donors: rollups.slice(0, limit),
-    totalMatched: rollups.length,
-    truncated: rollups.length > limit,
+    donors: matched.slice(0, limit),
+    totalMatched: matched.length,
+    truncated: matched.length > limit,
     sortBy,
     limit,
   };

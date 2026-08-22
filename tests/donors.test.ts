@@ -201,3 +201,37 @@ test('TRAP: donor count must never be the donation count', () => {
   assert.equal(r.totalMatched, 223);
   assert.notEqual(r.totalMatched, 251, 'rows are being treated as people');
 });
+
+// ── search ───────────────────────────────────────────────────────────────────
+
+test('search matches display name and email, case-insensitively', () => {
+  // Several generated donors also render as "Wei Kim" (wei.kim###@example.org),
+  // so a name search legitimately returns all of them.
+  const byName = computeDonorRollup(ROWS, { search: 'wei kim', limit: 50 });
+  assert.ok(byName.totalMatched >= 1);
+  assert.ok(byName.donors.every((d) => d.displayName === 'Wei Kim'));
+  assert.equal(byName.donors[0].email, 'wei.kim@example.org', 'sorted by lifetime');
+
+  const byEmail = computeDonorRollup(ROWS, { search: 'AMINA.HADDAD@', limit: 50 });
+  assert.equal(byEmail.totalMatched, 1);
+
+  const partial = computeDonorRollup(ROWS, { search: 'haddad', limit: 100 });
+  assert.ok(partial.totalMatched > 1, 'a surname should match several donors');
+  assert.ok(partial.donors.every((d) => d.displayName.toLowerCase().includes('haddad') || d.email.includes('haddad')));
+});
+
+test('search cannot unmask an anonymous donor by their hidden name', () => {
+  const rows = [gift({ donorEmail: 'ghost@example.org', donorName: 'Secret Person', anonymous: true })];
+  assert.equal(computeDonorRollup(rows, { search: 'Secret' }).totalMatched, 0);
+  assert.equal(computeDonorRollup(rows, { search: 'ghost@' }).totalMatched, 0);
+  assert.equal(computeDonorRollup(rows, { search: 'anonymous' }).totalMatched, 1);
+});
+
+test('search narrows totalMatched and truncated together', () => {
+  const all = computeDonorRollup(ROWS, { limit: 10 });
+  const searched = computeDonorRollup(ROWS, { search: 'zzzz-no-such-donor', limit: 10 });
+  assert.equal(all.totalMatched, 223);
+  assert.equal(searched.totalMatched, 0);
+  assert.equal(searched.truncated, false);
+  assert.deepEqual(searched.donors, []);
+});

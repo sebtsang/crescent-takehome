@@ -118,6 +118,7 @@ export const topDonors = query({
     sortBy: v.optional(v.union(...DONOR_SORTS.map((s) => v.literal(s)))),
     limit: v.optional(v.number()),
     minGiftCount: v.optional(v.number()),
+    search: v.optional(v.string()),
   },
   handler: async (ctx, args) =>
     computeDonorRollup(await loadDonations(ctx), {
@@ -125,6 +126,7 @@ export const topDonors = query({
       sortBy: args.sortBy,
       limit: args.limit,
       minGiftCount: args.minGiftCount,
+      search: args.search,
     }),
 });
 
