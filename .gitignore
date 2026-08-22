@@ -6,3 +6,11 @@ convex/_generated/
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+takehome-brief.md
+
+# Local AI-tooling state (not project code)
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+skills-lock.json
