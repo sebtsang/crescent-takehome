@@ -262,22 +262,13 @@ that there was no activity in that period, and ideally name the actual data rang
 By raised → legal-defense-fund. By % of goal → winter-meal-drive. Both defensible.
 The agent must say which metric it used; picking silently is guessing.
 
-### Q3 "Who are our top 10 donors?" → **tie-break landmine**
+### Q3 "Who are our top 10 donors?" -> tie broken by email
 
-| # | email | lifetime | gifts | last gift |
-|---|---|---:|---:|---|
-| 1 | amina.haddad@example.org | $3,435.00 | 11 | 2026-06-28 |
-| 2 | wei.kim@example.org | $3,110.00 | 13 | 2026-06-11 |
-| 3–10 | *32 donors tied at exactly $1,000.00* | $1,000.00 | 1 | various |
-
-**32 donors have exactly $1,000 lifetime.** Ranks 3–10 are arbitrary without a
-deterministic secondary sort key (email is the obvious stable tiebreak). Without
-one, the dashboard and the agent will each pick a different #7 — the exact
-"dashboard and agent disagree" failure the brief calls worse than either being
-wrong alone.
-
-**Both #1 and #2 have at least one anonymous gift.** The top-donor list must count
-them fully while not exposing the identity where a gift was marked anonymous.
+Ranks 1-2 are unambiguous (amina.haddad $3,435, wei.kim $3,110). **32 donors are
+tied at exactly $1,000**, so ranks 3-10 are arbitrary without a deterministic
+secondary sort. `computeDonorRollup` tiebreaks on email ascending; the resolved
+top 10 is in BASELINE.md. Both top donors have anonymous gifts and both correctly
+resolve to *named*, because a donor is anonymous only if every gift was.
 
 ### Q4 "How many people gave more than once?" → **3**
 

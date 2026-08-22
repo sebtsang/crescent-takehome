@@ -455,3 +455,139 @@ export function computeTimeseries(
     },
   };
 }
+
+// ── Donor rollup ─────────────────────────────────────────────────────────────
+
+export const DONOR_SORTS = ['lifetime', 'giftCount', 'lastGift', 'firstGift'] as const;
+export type DonorSort = (typeof DONOR_SORTS)[number];
+
+export const DEFAULT_DONOR_LIMIT = 20;
+export const MAX_DONOR_LIMIT = 100;
+
+export const ANONYMOUS_DONOR_LABEL = 'Anonymous donor';
+const UNNAMED_DONOR_LABEL = 'Unnamed donor';
+
+export type DonorRollup = {
+  /**
+   * The normalised email -- the donor's identity. The dashboard renders it; the
+   * agent's tool layer projects it away, because tool results are persisted
+   * verbatim in chatMessages and none of the assistant's questions need it.
+   */
+  email: string;
+  displayName: string;
+  /** True only when EVERY gift was anonymous. See the note on the resolver below. */
+  isAnonymous: boolean;
+  giftCount: number;
+  lifetime: MoneyFigure;
+  averageGift: MoneyFigure | null;
+  firstGiftISO: string;
+  lastGiftISO: string;
+  campaignCount: number;
+};
+
+export type DonorRollupResult = {
+  donors: DonorRollup[];
+  /** Donors matching before the limit was applied. */
+  totalMatched: number;
+  /** True when `donors` is a partial view -- never let a caller imply otherwise. */
+  truncated: boolean;
+  sortBy: DonorSort;
+  limit: number;
+};
+
+/**
+ * Anonymity is a PER-GIFT flag, so "is this donor anonymous" needs a rule.
+ *
+ * The rule: a donor is anonymous only if EVERY one of their gifts was. Two
+ * emails in the seed appear both ways -- once named, once anonymous -- and
+ * someone who has publicly attached their name to a gift has not asked to be
+ * hidden. Reading whichever row happened to come first would make the label
+ * depend on insertion order.
+ */
+function resolveDisplayName(rows: readonly DonationLike[]): {
+  displayName: string;
+  isAnonymous: boolean;
+} {
+  const named = rows
+    .filter((r) => r.anonymous !== true)
+    .sort((a, b) => b.createdAt - a.createdAt);
+  if (named.length === 0) {
+    return { displayName: ANONYMOUS_DONOR_LABEL, isAnonymous: true };
+  }
+  // Most recent non-anonymous gift wins: names change, and the latest is current.
+  const name = named.find((r) => r.donorName?.trim())?.donorName?.trim();
+  return { displayName: name || UNNAMED_DONOR_LABEL, isAnonymous: false };
+}
+
+/**
+ * Collapses succeeded gifts into one row per donor.
+ *
+ * Ordering is deterministic to the last row. 32 donors in this dataset have a
+ * lifetime of exactly $1,000, so ranks 3 through 10 of a "top 10" are a
+ * coin-flip without a tiebreak -- and the dashboard and the agent would each
+ * pick a different #7 while both looked correct. Email is the tiebreak because
+ * it is unique and stable.
+ *
+ * `limit` is clamped server-side. An uncapped list tool is "paste every row into
+ * the prompt" by the back door, and a silent truncation is a correctness bug:
+ * "our donors are X, Y and Z" is false when there are 223.
+ */
+export function computeDonorRollup(
+  allRows: readonly DonationLike[],
+  options: {
+    scope?: DonationScope;
+    sortBy?: DonorSort;
+    limit?: number;
+    /** e.g. 2 to answer "how many people gave more than once?" */
+    minGiftCount?: number;
+  } = {}
+): DonorRollupResult {
+  const scope = options.scope ?? FULL_SCOPE;
+  const sortBy = options.sortBy ?? 'lifetime';
+  const limit = Math.min(Math.max(1, options.limit ?? DEFAULT_DONOR_LIMIT), MAX_DONOR_LIMIT);
+  const minGiftCount = Math.max(1, options.minGiftCount ?? 1);
+
+  const succeeded = partitionByStatus(filterDonationsByScope(allRows, scope)).succeeded;
+
+  const byDonor = new Map<string, DonationLike[]>();
+  for (const row of succeeded) {
+    const key = normalizeDonorEmail(row.donorEmail);
+    const existing = byDonor.get(key);
+    if (existing) existing.push(row);
+    else byDonor.set(key, [row]);
+  }
+
+  const rollups: DonorRollup[] = [];
+  for (const [email, rows] of byDonor) {
+    if (rows.length < minGiftCount) continue;
+    const lifetimeCents = sumCents(rows.map((r) => r.amountCents));
+    const timestamps = rows.map((r) => r.createdAt);
+    rollups.push({
+      email,
+      ...resolveDisplayName(rows),
+      giftCount: rows.length,
+      lifetime: money(lifetimeCents),
+      averageGift: optionalMoney(averageCents(lifetimeCents, rows.length)),
+      firstGiftISO: new Date(Math.min(...timestamps)).toISOString(),
+      lastGiftISO: new Date(Math.max(...timestamps)).toISOString(),
+      campaignCount: new Set(rows.map((r) => r.campaignId)).size,
+    });
+  }
+
+  const metric = (d: DonorRollup) => {
+    if (sortBy === 'lifetime') return d.lifetime.cents;
+    if (sortBy === 'giftCount') return d.giftCount;
+    if (sortBy === 'lastGift') return Date.parse(d.lastGiftISO);
+    return Date.parse(d.firstGiftISO);
+  };
+
+  rollups.sort((a, b) => metric(b) - metric(a) || a.email.localeCompare(b.email));
+
+  return {
+    donors: rollups.slice(0, limit),
+    totalMatched: rollups.length,
+    truncated: rollups.length > limit,
+    sortBy,
+    limit,
+  };
+}

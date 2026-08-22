@@ -101,7 +101,7 @@ If code or a test ever produces one of these, a specific rule has broken:
 |---|---|
 | How much did we raise last month? | **$0.00** — "last month" has no data; most recent gift is 2026-06-29 |
 | Which campaign is doing best? | Ambiguous — legal-defense-fund by raised ($42,940), winter-meal-drive by % of goal (199.0%). Must state the metric. |
-| Who are our top 10 donors? | #1 amina.haddad $3,435, #2 wei.kim $3,110, then **32 donors tied at exactly $1,000** — ranks 3-10 need a deterministic tiebreak |
+| Who are our top 10 donors? | #1 amina.haddad $3,435 (11 gifts), #2 wei.kim $3,110 (13 gifts), then **32 donors tied at exactly $1,000** — see below |
 | How many people gave more than once? | **3** |
 | Did the meal drive beat the legal fund in March? | **No** — legal fund $7,710.00 (24 gifts) vs meal drive $3,785.00 (14 gifts) |
 
@@ -111,3 +111,49 @@ If code or a test ever produces one of these, a specific rule has broken:
 - `scholarship-endowment` — active, $7,275 raised, **no goal**: progress must be `null`, not `0%` or `Infinity`.
 - 44 of 180 days have no donations — timeseries must emit explicit zero buckets.
 - Any range after 2026-06-29 is legitimately empty.
+
+## Donors
+
+| metric | value | filter |
+|---|---:|---|
+| Unique donors | 223 | `succeeded`, distinct normalised email |
+| Donors with >1 gift | 3 | `succeeded`, gift count >= 2 |
+| Donors tied at exactly $1,000 lifetime | **32** | `succeeded` |
+| Fully anonymous donors (every gift anonymous) | 15 | `succeeded` |
+| Mixed-anonymity donors (some anon, some named) | 2 | wei.kim (1 of 13), amina.haddad (2 of 11) |
+| Anonymous succeeded gifts | 18 | `anonymous === true` |
+
+**Top donors, with the tie broken by email ascending.** Ranks 1-2 are unambiguous.
+Everything from rank 3 down is tied at $1,000, so the order below is only
+reproducible *because* of the tiebreak — without one, the dashboard and the agent
+would each pick a different #7.
+
+| # | email | lifetime | gifts |
+|---:|---|---:|---:|
+| 1 | amina.haddad@example.org | $3,435.00 | 11 |
+| 2 | wei.kim@example.org | $3,110.00 | 13 |
+| 3 | amina.kim101@example.org | $1,000.00 | 1 |
+| 4 | andre.ali364@example.org | $1,000.00 | 1 |
+| 5 | andre.haddad615@example.org | $1,000.00 | 1 |
+| 6 | andre.rahman367@example.org | $1,000.00 | 1 |
+| 7 | clara.kim268@example.org | $1,000.00 | 1 |
+| 8 | clara.nguyen816@example.org | $1,000.00 | 1 |
+| 9 | clara.rahman624@example.org | $1,000.00 | 1 |
+| 10 | diego.kim699@example.org | $1,000.00 | 1 |
+
+**Anonymity rule:** a donor is anonymous only if *every* gift was. Both
+mixed-anonymity donors above resolve to named — someone who publicly attached
+their name to a gift has not asked to be hidden.
+
+## Timeseries
+
+| window | granularity | buckets | empty |
+|---|---|---:|---:|
+| 2026-01-01 .. 2026-06-29 | day | 180 | **47** |
+| 2026-01-01 .. 2026-01-31 | day | 31 | 5 |
+| all time | week | 27 | 0 |
+| all time | month | 6 | 0 |
+| 2026-07 (last month) | day | 31 | **31** |
+
+First week bucket is **2025-12-29** — Jan 1 2026 was a Thursday, so the
+Monday-start week containing it began in the previous year. Correct, not a bug.
