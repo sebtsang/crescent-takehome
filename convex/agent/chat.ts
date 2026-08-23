@@ -22,7 +22,15 @@ import { AGENT_TOOLS, SYSTEM_PROMPT, TOOLS_BY_NAME } from './tools';
  * convention.
  */
 
-const MODEL = 'claude-opus-5';
+/**
+ * Sonnet 5 rather than Opus 5. This workload is tool routing plus a two-sentence
+ * summary, not hard reasoning, and the correctness guarantees live in the server
+ * -- an empty period answers honestly because the tool result carries
+ * rowsMatched and the dataset's date bounds, not because the model is clever.
+ * Cheaper and faster, and verified against BASELINE.md on all five required
+ * questions before being adopted.
+ */
+const MODEL = 'claude-sonnet-5';
 
 /**
  * Credentials, in precedence order.
