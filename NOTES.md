@@ -669,8 +669,45 @@ is a presentation error — three different fixes in three different files.
 
 ### Setup required
 
-Credentials live on the **Convex deployment**, not in `.env.local` — the agent
-runs in a Convex action, server-side, so `.env.local` would never reach it.
+### Deviation from the README: the key is NOT in `.env.local`
+
+The README says to put the API key in `.env.local`. **This project cannot use
+that**, and the reason is where the code runs rather than a preference.
+
+`.env.local` is read by Next.js, on the developer's machine. The agent runs in a
+**Convex action**, which executes on Convex's servers, so `process.env` inside it
+resolves against the Convex deployment's environment — a key in `.env.local` is
+invisible to it.
+
+The README's instruction assumes the Anthropic call happens in the Next.js
+process (a route handler or server action). That is a legitimate architecture and
+would keep the key in `.env.local` as written. It was not chosen because
+`appendMessage` is an `internalMutation`, reachable only from inside Convex;
+driving the agent from a Next route would require exposing the chat mutations
+publicly, so anything on the internet could write into `chatThreads` /
+`chatMessages`. With no auth in this project, that door is better left shut.
+
+Note the "one implementation" guarantee survives either way — a Next route using
+`ConvexHttpClient` would call the same `api.reporting.*` functions. The deciding
+factor was the internal-mutation boundary and the extra hop, not correctness.
+
+`.env.local` is still used, for `NEXT_PUBLIC_CONVEX_URL`, which `npx convex dev`
+writes automatically.
+
+`.env.example` has been edited to say this too — worth flagging that the edit is
+ours, not the starter's. The starter listed `ANTHROPIC_API_KEY=` directly under
+"Copy to .env.local", so the original repo did intend `.env.local`. README.md is
+unmodified and still says so.
+
+**To run the assistant**, after `npx convex dev`:
+
+```
+npx convex env set ANTHROPIC_API_KEY <key>
+```
+
+### Credentials
+
+Credentials live on the **Convex deployment**.
 
 ```
 npx convex env set ANTHROPIC_API_KEY <key>
