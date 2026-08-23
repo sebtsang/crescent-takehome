@@ -103,13 +103,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   />
                 </div>
                 <div className="num text-xs text-txt3">
-                  {group?.raised.formatted} of {group?.goal?.formatted}
+                  {group?.lifetimeRaised?.formatted} of {group?.goal?.formatted}
                   {(group?.goalProgressPct ?? 0) > 100 && (
                     <span className="ml-1 text-txt2">· over goal</span>
                   )}
                 </div>
                 <div className="num text-[0.6875rem] text-txt3">
-                  Goal progress uses money raised in the selected range.
+                  Lifetime progress — a goal is a cumulative target, so this does
+                  not change with the selected range.
                 </div>
               </>
             )}

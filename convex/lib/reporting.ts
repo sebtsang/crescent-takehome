@@ -240,9 +240,21 @@ export type BreakdownGroup = {
   campaignStatus?: CampaignLike['status'];
   goal?: MoneyFigure | null;
   /**
+   * Lifetime raised for this campaign, IGNORING any date range in the scope.
+   * Present so goalProgressPct is auditable rather than a number you have to
+   * trust.
+   */
+  lifetimeRaised?: MoneyFigure;
+  /**
    * TRUE percent, uncapped -- two seeded campaigns are over goal (171.8%, 199.0%).
    * Clamping belongs to the progress bar, not to the number. null when the
    * campaign has no goal, so nothing ever divides by zero or renders Infinity.
+   *
+   * Computed from LIFETIME raised, deliberately independent of the range scope.
+   * A goal is a cumulative target: filtering the view to March must not make a
+   * campaign that is at 171.8% report 30.8%. Scoping the numerator against an
+   * unscoped denominator produces exactly the kind of plausible-looking wrong
+   * number this codebase exists to avoid.
    */
   goalProgressPct?: number | null;
 };
@@ -301,10 +313,22 @@ export function computeBreakdown(
     const requested = scope.campaignIds ? new Set(scope.campaignIds) : null;
     const visible = requested ? campaigns.filter((c) => requested.has(c._id)) : campaigns;
 
+    // Lifetime totals per campaign, ignoring any date range: goal progress is
+    // measured against these, never against the scoped figure.
+    const lifetimeByCampaign = new Map<string, number>();
+    for (const row of allRows) {
+      if (!countsAsRaised(row.status)) continue;
+      lifetimeByCampaign.set(
+        row.campaignId,
+        (lifetimeByCampaign.get(row.campaignId) ?? 0) + row.amountCents
+      );
+    }
+
     for (const campaign of visible) {
       const rows = succeeded.filter((r) => r.campaignId === campaign._id);
       const summary = summarize(rows);
       const hasGoal = typeof campaign.goalCents === 'number' && campaign.goalCents > 0;
+      const lifetimeCents = lifetimeByCampaign.get(campaign._id) ?? 0;
       groups.push({
         key: campaign._id,
         label: campaign.name,
@@ -312,8 +336,9 @@ export function computeBreakdown(
         shareOfTotalPct: toPercent(summary.raised.cents, scopedTotalCents),
         campaignStatus: campaign.status,
         goal: hasGoal ? money(campaign.goalCents as number) : null,
+        lifetimeRaised: money(lifetimeCents),
         goalProgressPct: hasGoal
-          ? toPercent(summary.raised.cents, campaign.goalCents as number)
+          ? toPercent(lifetimeCents, campaign.goalCents as number)
           : null,
       });
     }

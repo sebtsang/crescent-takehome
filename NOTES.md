@@ -221,7 +221,68 @@ Recorded rather than silently resolved:
 
 ## 6. Decisions log
 
-*(empty — architecture proposed but not yet approved or implemented)*
+> Entries marked **[KEEP]** carry through to the final NOTES.md rewrite (§11).
+> Everything else in this file is working scratch.
+
+### D8 — The assistant runs in a Convex action, not a Next route **[KEEP]**
+
+**Decision.** The agent loop lives in `convex/agent/chat.ts`, a Convex action, and
+its credential is a Convex deployment environment variable. This deviates from
+README.md, which says to put the API key in `.env.local`.
+
+**Why the deviation is forced by the choice.** `.env.local` is read by Next.js on
+the developer's machine. A Convex action executes on Convex's servers, so
+`process.env` inside it resolves against the deployment. A key in `.env.local`
+would simply be invisible. The README's instruction presumes the Anthropic call
+happens in the Next process — a route handler or server action — which is a
+legitimate design we did not choose.
+
+**Why we chose the action anyway.**
+- Every other piece of backend logic in this app is a Convex function. One Next
+  route for the single external call is architecturally inconsistent.
+- Convex actions tolerate a multi-turn tool loop; typical serverless route
+  timeouts (10–60s) are a poor fit for one.
+- `ctx.runQuery` is in-process — no second client, no HTTP hop, no extra
+  serialization boundary between the agent and the queries it calls.
+- `appendMessage` stays an `internalMutation`, unreachable from outside Convex.
+
+**Honest accounting of what this does NOT buy.** Two arguments made in favour of
+this during development were overstated and are corrected here:
+1. *"The one-implementation guarantee is structural."* It is not. A Next route
+   using `ConvexHttpClient` would call the identical `api.reporting.*` functions.
+   The guarantee comes from the tool surface, not from the runtime.
+2. *"Internal mutations keep the chat tables shut."* Weak: `addUserMessage` is
+   already a public mutation, so the tables are already writable from outside.
+
+**Rejected alternative.** Next route handler with the key in `.env.local`,
+matching the README literally. The real cost of not choosing it is reviewer
+friction: someone following the README puts the key in `.env.local`, gets "not
+configured", and has to read NOTES.md to find out why. Mitigated by an error
+message that names the exact command, and by run instructions in §15.
+
+**Reversible.** Roughly 45 minutes: move the loop to `app/api/assistant/route.ts`,
+swap `ctx.runQuery` for `ConvexHttpClient`, make the chat mutations public.
+
+### D9 — Goal progress is lifetime, never scoped to the range **[KEEP]**
+
+`goalProgressPct` is computed from a campaign's **lifetime** raised, deliberately
+ignoring any date range in the scope.
+
+Found while verifying the assistant against BASELINE.md. Scoped to March, the
+Legal Defense Fund reported **30.8%** of goal; it is actually at **171.8%**. The
+old code divided a range-scoped numerator by a lifetime denominator — a number
+that is plausible, prominent, and wrong, which is precisely the failure mode this
+codebase is built to avoid.
+
+A goal is a cumulative target. Filtering the view to March must not move it.
+Groups now also return `lifetimeRaised` so the percentage is auditable rather
+than something you have to trust.
+
+Worth noting how it surfaced: the **assistant flagged it unprompted**, adding
+"note the goal progress figures shown here are cumulative to date, not
+March-only" to its answer. Its explanation was backwards — the figure was
+March-only over a lifetime goal, not cumulative — but it noticed the field was
+inconsistent with the question being asked. Two tests now pin the behaviour.
 
 ---
 

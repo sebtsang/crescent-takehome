@@ -163,3 +163,33 @@ test('TRAP: breakdown must exclude non-succeeded money', () => {
   assert.equal(legal.donationCount, 154, 'status filter missing from breakdown');
   assert.notEqual(legal.raised.cents, naive, 'breakdown summed every status');
 });
+
+test('goal progress is LIFETIME and does not move with the range scope', () => {
+  const march = resolveRange({ startISO: '2026-03-01', endISO: '2026-03-31' }, NOW_MS);
+  const scoped = byCampaign({
+    dimension: 'campaign',
+    scope: { range: march, campaignIds: ['legal-defense-fund'] },
+  }).groups[0];
+
+  // March raised is a fraction of lifetime...
+  assert.equal(scoped.raised.cents, 771_000);
+  assert.equal(scoped.lifetimeRaised?.cents, 4_294_000);
+  // ...but the campaign is still at 171.8% of its goal, not 30.8%.
+  assert.equal(scoped.goalProgressPct, 171.8);
+  assert.notEqual(scoped.goalProgressPct, 30.8, 'scoped numerator over lifetime goal');
+
+  // Identical to the unscoped figure, which is the whole point.
+  const unscoped = byCampaign().groups.find((g) => g.key === 'legal-defense-fund')!;
+  assert.equal(scoped.goalProgressPct, unscoped.goalProgressPct);
+});
+
+test('goal progress stays null for a campaign with no goal, under any scope', () => {
+  const march = resolveRange({ startISO: '2026-03-01', endISO: '2026-03-31' }, NOW_MS);
+  for (const scope of [undefined, { range: march }]) {
+    const g = byCampaign({ dimension: 'campaign', scope }).groups.find(
+      (x) => x.key === 'scholarship-endowment'
+    )!;
+    assert.equal(g.goalProgressPct, null);
+    assert.equal(g.goal, null);
+  }
+});
