@@ -669,16 +669,37 @@ is a presentation error — three different fixes in three different files.
 
 ### Setup required
 
-The assistant needs a key on the **Convex deployment** (not `.env.local` — the
-action runs server-side):
+Credentials live on the **Convex deployment**, not in `.env.local` — the agent
+runs in a Convex action, server-side, so `.env.local` would never reach it.
 
 ```
 npx convex env set ANTHROPIC_API_KEY <key>
 ```
 
-Without it the agent degrades gracefully: it appends a message naming the missing
-variable and the command to fix it, rather than throwing. That path is verified;
-the model path is not (see §16).
+Without any credential the agent degrades gracefully: it appends a message naming
+the variables and the commands to fix them rather than throwing. That path is
+verified; the model path is not (see §16).
+
+**`ANTHROPIC_API_KEY` is the intended and supported configuration**, and the only
+one this project treats as shipped. It is what a reviewer will set.
+
+**`ANTHROPIC_AUTH_TOKEN` is a local-development convenience.**
+`claude setup-token` issues a long-lived OAuth credential tied to a Claude
+subscription; the Messages API accepts it as `Authorization: Bearer` together
+with the `anthropic-beta: oauth-2025-04-20` header, and usage draws on the
+subscription rather than Console credits. That makes iterating on the agent free.
+
+It is checked **before** the API key, so setting it is an explicit override and a
+deployment with only `ANTHROPIC_API_KEY` behaves exactly as the supported path.
+The active mode is logged (`[assistant] auth mode: …`) so it is never a mystery
+which credential answered.
+
+Two honest caveats, recorded rather than buried: this is **not an officially
+supported way to authenticate a third-party application** — the beta header and
+OAuth scopes carry no compatibility promise and can stop working without notice —
+and it is outside the intended use of a subscription credential. It is used here
+only for local iteration against the author's own subscription, never as the
+shipped configuration.
 
 ---
 
