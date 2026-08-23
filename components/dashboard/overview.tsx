@@ -82,7 +82,7 @@ function CampaignBreakdownCard({ scope }: { scope: Scope }) {
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-right align-top">
-                    <GoalCell pct={g.goalProgressPct ?? null} goal={g.goal?.formatted} />
+                    <GoalCell pct={g.lifetimeGoalProgressPct ?? null} goal={g.goal?.formatted} />
                   </td>
                 </tr>
               ))}

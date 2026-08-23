@@ -241,8 +241,8 @@ export type BreakdownGroup = {
   goal?: MoneyFigure | null;
   /**
    * Lifetime raised for this campaign, IGNORING any date range in the scope.
-   * Present so goalProgressPct is auditable rather than a number you have to
-   * trust.
+   * Present so lifetimeGoalProgressPct is auditable rather than a number you
+   * have to trust.
    */
   lifetimeRaised?: MoneyFigure;
   /**
@@ -252,11 +252,16 @@ export type BreakdownGroup = {
    *
    * Computed from LIFETIME raised, deliberately independent of the range scope.
    * A goal is a cumulative target: filtering the view to March must not make a
-   * campaign that is at 171.8% report 30.8%. Scoping the numerator against an
-   * unscoped denominator produces exactly the kind of plausible-looking wrong
-   * number this codebase exists to avoid.
+   * campaign that is at 171.8% report 30.8%.
+   *
+   * The name carries `lifetime` on purpose. When this was called
+   * `goalProgressPct` it sat inside a March-scoped result next to March-scoped
+   * money, and BOTH models tested described it as March's figure -- "199% of its
+   * goal that month". The numbers were right and the sentence was wrong. A
+   * self-describing field name fixes that at the source; a rule in the system
+   * prompt would have been the weaker fix.
    */
-  goalProgressPct?: number | null;
+  lifetimeGoalProgressPct?: number | null;
 };
 
 /** One decimal place, computed from a ratio so the rounding happens once. */
@@ -337,7 +342,7 @@ export function computeBreakdown(
         campaignStatus: campaign.status,
         goal: hasGoal ? money(campaign.goalCents as number) : null,
         lifetimeRaised: money(lifetimeCents),
-        goalProgressPct: hasGoal
+        lifetimeGoalProgressPct: hasGoal
           ? toPercent(lifetimeCents, campaign.goalCents as number)
           : null,
       });

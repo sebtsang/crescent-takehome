@@ -94,17 +94,17 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
             ) : (
               <>
                 <div className="num text-[1.75rem] font-medium leading-none tracking-tighter">
-                  {group?.goalProgressPct ?? 0}%
+                  {group?.lifetimeGoalProgressPct ?? 0}%
                 </div>
                 <div className="h-1.5 w-full bg-bar-muted">
                   <div
                     className="h-full bg-bar"
-                    style={{ width: `${Math.min(100, group?.goalProgressPct ?? 0)}%` }}
+                    style={{ width: `${Math.min(100, group?.lifetimeGoalProgressPct ?? 0)}%` }}
                   />
                 </div>
                 <div className="num text-xs text-txt3">
                   {group?.lifetimeRaised?.formatted} of {group?.goal?.formatted}
-                  {(group?.goalProgressPct ?? 0) > 100 && (
+                  {(group?.lifetimeGoalProgressPct ?? 0) > 100 && (
                     <span className="ml-1 text-txt2">· over goal</span>
                   )}
                 </div>

@@ -58,14 +58,14 @@ test('goal progress is the TRUE percent, and null when there is no goal', () => 
   const find = (slug: string) => groups.find((g) => g.key === slug)!;
 
   // Over goal -- reported honestly, not capped at 100.
-  assert.equal(find('legal-defense-fund').goalProgressPct, 171.8);
-  assert.equal(find('winter-meal-drive').goalProgressPct, 199);
-  assert.equal(find('emergency-relief-2025').goalProgressPct, 1.1);
+  assert.equal(find('legal-defense-fund').lifetimeGoalProgressPct, 171.8);
+  assert.equal(find('winter-meal-drive').lifetimeGoalProgressPct, 199);
+  assert.equal(find('emergency-relief-2025').lifetimeGoalProgressPct, 1.1);
 
   // No goal -- null, never 0 / NaN / Infinity.
   assert.equal(find('scholarship-endowment').goal, null);
-  assert.equal(find('scholarship-endowment').goalProgressPct, null);
-  assert.equal(find('untitled-draft').goalProgressPct, null);
+  assert.equal(find('scholarship-endowment').lifetimeGoalProgressPct, null);
+  assert.equal(find('untitled-draft').lifetimeGoalProgressPct, null);
 });
 
 test('ended and draft campaigns are included, and carry their status', () => {
@@ -150,7 +150,7 @@ test('frequency breakdown reproduces the verified baseline', () => {
     6_670_500
   );
   // Frequency groups carry no goal -- that concept is campaign-only.
-  assert.equal(find('monthly').goalProgressPct, undefined);
+  assert.equal(find('monthly').lifetimeGoalProgressPct, undefined);
 });
 
 test('TRAP: breakdown must exclude non-succeeded money', () => {
@@ -175,12 +175,12 @@ test('goal progress is LIFETIME and does not move with the range scope', () => {
   assert.equal(scoped.raised.cents, 771_000);
   assert.equal(scoped.lifetimeRaised?.cents, 4_294_000);
   // ...but the campaign is still at 171.8% of its goal, not 30.8%.
-  assert.equal(scoped.goalProgressPct, 171.8);
-  assert.notEqual(scoped.goalProgressPct, 30.8, 'scoped numerator over lifetime goal');
+  assert.equal(scoped.lifetimeGoalProgressPct, 171.8);
+  assert.notEqual(scoped.lifetimeGoalProgressPct, 30.8, 'scoped numerator over lifetime goal');
 
   // Identical to the unscoped figure, which is the whole point.
   const unscoped = byCampaign().groups.find((g) => g.key === 'legal-defense-fund')!;
-  assert.equal(scoped.goalProgressPct, unscoped.goalProgressPct);
+  assert.equal(scoped.lifetimeGoalProgressPct, unscoped.lifetimeGoalProgressPct);
 });
 
 test('goal progress stays null for a campaign with no goal, under any scope', () => {
@@ -189,7 +189,20 @@ test('goal progress stays null for a campaign with no goal, under any scope', ()
     const g = byCampaign({ dimension: 'campaign', scope }).groups.find(
       (x) => x.key === 'scholarship-endowment'
     )!;
-    assert.equal(g.goalProgressPct, null);
+    assert.equal(g.lifetimeGoalProgressPct, null);
     assert.equal(g.goal, null);
+  }
+});
+
+test('the ambiguous `goalProgressPct` name cannot come back', () => {
+  // Renamed because, sitting inside a range-scoped result next to range-scoped
+  // money, the old name read as "progress during this period". Both models
+  // tested described it that way. The name is the fix, so guard it.
+  for (const g of byCampaign().groups) {
+    assert.ok(
+      !('goalProgressPct' in g),
+      'goal progress must be named lifetimeGoalProgressPct so it cannot be read as scoped'
+    );
+    assert.ok('lifetimeGoalProgressPct' in g);
   }
 });

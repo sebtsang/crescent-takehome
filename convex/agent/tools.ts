@@ -58,7 +58,10 @@ export const AGENT_TOOLS: AgentTool[] = [
       'Totals grouped by campaign (or by gift frequency). Use for "which ' +
       'campaign is doing best", for comparing named campaigns, and for any ' +
       'per-campaign question. Returns raised, gifts, donors, average gift, ' +
-      'share of the period total, and goal progress per group.',
+      'share of the period total, and lifetimeGoalProgressPct per group. That ' +
+      'goal figure is ALWAYS lifetime and never reflects the requested range -- ' +
+      'a goal is a cumulative target. Never describe it as the progress made ' +
+      'during the period you asked about.',
     input_schema: {
       type: 'object',
       properties: {
