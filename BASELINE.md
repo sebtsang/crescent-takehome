@@ -1,7 +1,7 @@
 # Verified Baseline
 
 Ground truth for every figure this project reports. Confirmed two independent ways:
-read out of Convex deployment `dev:acoustic-dodo-759`, and re-derived offline from the
+read out of the seeded Convex development deployment, and re-derived offline from the
 seed's PRNG. All 283 rows matched field-by-field.
 
 Re-verify at any time:

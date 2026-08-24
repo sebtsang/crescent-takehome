@@ -1,0 +1,577 @@
+<title>Crescent Reporting Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --ground:  #fefefe;
+    --panel:   #f2f2f2;
+    --raised:  #ffffff;
+    --line:    #e6e6e6;
+    --ink:     #000614;
+    --ink2:    #4a4f5c;
+    --ink3:    #767b85;
+    --accent:  #22445c;
+    --accent-soft: #dbe3ea;
+    --wrong:   #8a3324;
+    --wrong-soft: #f3e4e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0e0e0e;
+      --panel:   #171717;
+      --raised:  #1f1f1f;
+      --line:    #262626;
+      --ink:     #fefefe;
+      --ink2:    #a6a6a6;
+      --ink3:    #6e6e6e;
+      --accent:  #7ba0bc;
+      --accent-soft: #1e2a33;
+      --wrong:   #c98a7b;
+      --wrong-soft: #2b1c18;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #0e0e0e;
+    --panel:   #171717;
+    --raised:  #1f1f1f;
+    --line:    #262626;
+    --ink:     #fefefe;
+    --ink2:    #a6a6a6;
+    --ink3:    #6e6e6e;
+    --accent:  #7ba0bc;
+    --accent-soft: #1e2a33;
+    --wrong:   #c98a7b;
+    --wrong-soft: #2b1c18;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0 24px 96px;
+  }
+
+  .shell { max-width: 1100px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── type ─────────────────────────────────────────────── */
+  h1, h2, h3 { font-family: "Space Mono", ui-monospace, monospace; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+  h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+  h3 { font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; }
+  p  { margin: 0; }
+  code, .mono { font-family: "Space Mono", ui-monospace, monospace; }
+  code { font-size: 0.86em; background: var(--panel); border: 1px solid var(--line); padding: 0.05em 0.32em; border-radius: 2px; }
+
+  .eyebrow {
+    font-family: "Space Mono", ui-monospace, monospace;
+    font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--ink3);
+  }
+
+  header.masthead {
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 72px 0 32px; border-bottom: 2px solid var(--ink);
+  }
+  header.masthead .lede { color: var(--ink2); font-size: 1.02rem; max-width: 62ch; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 28px; padding-top: 6px; }
+  .meta div { display: flex; flex-direction: column; gap: 2px; }
+  .meta .v { font-family: "Space Mono", ui-monospace, monospace; font-size: 0.82rem; }
+
+  section { display: flex; flex-direction: column; gap: 20px; padding: 52px 0; border-bottom: 1px solid var(--line); }
+  section > .head { display: flex; flex-direction: column; gap: 8px; }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .canvas { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 20px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; min-width: 660px; height: auto; }
+  figcaption { color: var(--ink2); font-size: 0.86rem; max-width: 74ch; }
+
+  /* ── tables ───────────────────────────────────────────── */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 520px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: "Space Mono", ui-monospace, monospace; font-size: 0.65rem;
+    text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink3); font-weight: 700;
+    background: var(--panel);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-family: "Space Mono", ui-monospace, monospace; }
+  .ok    { color: var(--accent); font-weight: 600; }
+  .bad   { color: var(--wrong); font-weight: 600; }
+
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; }
+  .card .v { font-family: "Space Mono", ui-monospace, monospace; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.03em; }
+  .card .n { font-size: 0.75rem; color: var(--ink3); }
+
+  .rules { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .rule { display: grid; grid-template-columns: 2.2rem 1fr; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .rule:last-child { border-bottom: 0; }
+  .rule .k { font-family: "Space Mono", ui-monospace, monospace; font-size: 0.72rem; font-weight: 700; color: var(--accent); padding-top: 2px; }
+  .rule .b { display: flex; flex-direction: column; gap: 4px; }
+  .rule .t { font-weight: 600; font-size: 0.92rem; }
+  .rule .d { color: var(--ink2); font-size: 0.87rem; }
+
+  .callout { background: var(--wrong-soft); border: 1px solid var(--wrong); border-radius: 3px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .callout .eyebrow { color: var(--wrong); }
+  .callout p { font-size: 0.89rem; }
+
+  footer { padding: 44px 0 0; color: var(--ink3); font-size: 0.82rem; display: flex; flex-direction: column; gap: 6px; }
+
+  a { color: var(--accent); }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <span class="eyebrow">Crescent take-home · Track B</span>
+    <h1>Reporting architecture</h1>
+    <p class="lede">
+      A fundraising reporting surface and an AI assistant that share the same deterministic
+      reporting queries, so there is no separate AI implementation of the fundraising maths.
+      This page shows the data model, where aggregation happens, and the rules that protect
+      the money.
+    </p>
+    <div class="meta">
+      <div><span class="eyebrow">Stack</span><span class="v">Convex · Next.js 15 · React 19</span></div>
+      <div><span class="eyebrow">Model</span><span class="v">claude-sonnet-5</span></div>
+      <div><span class="eyebrow">Tests</span><span class="v">88 passing</span></div>
+      <div><span class="eyebrow">Timezone</span><span class="v">UTC</span></div>
+    </div>
+  </header>
+
+  <!-- ══ 1. DATA MODEL ══════════════════════════════════ -->
+  <section>
+    <div class="head">
+      <span class="eyebrow">01 · Given, not designed</span>
+      <h2>The data model</h2>
+      <p class="prose">
+        Four tables, fixed by the scaffold. The important thing in this diagram is what
+        <em>isn't</em> there: no donors table. The provided model keys donor identity on a
+        normalised email, which is why 251 donations resolve to 223 people.
+      </p>
+    </div>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 470" role="img"
+             aria-label="Entity diagram: campaigns has many donations; chatThreads has many chatMessages; a donor is not a table but a value derived from the lowercased donorEmail field on donations.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g font-family="'Space Mono', monospace" fill="currentColor">
+
+            <!-- campaigns -->
+            <rect x="14" y="30" width="228" height="176" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <rect x="14" y="30" width="228" height="30" fill="var(--accent-soft)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="28" y="50" font-size="13" font-weight="700">campaigns</text>
+            <text x="28" y="80"  font-size="11.5" opacity=".55">_id</text>
+            <text x="28" y="100" font-size="11.5">name · slug</text>
+            <text x="28" y="120" font-size="11.5">status</text>
+            <text x="42" y="138" font-size="10.5" opacity=".6">draft | active | ended</text>
+            <text x="28" y="158" font-size="11.5">goalCents?</text>
+            <text x="42" y="176" font-size="10.5" opacity=".6">absent = no goal</text>
+            <text x="28" y="196" font-size="11.5" opacity=".55">createdAt</text>
+
+            <!-- donations -->
+            <rect x="336" y="30" width="248" height="230" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <rect x="336" y="30" width="248" height="30" fill="var(--accent-soft)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="350" y="50" font-size="13" font-weight="700">donations</text>
+            <text x="350" y="80"  font-size="11.5" opacity=".55">_id</text>
+            <text x="350" y="100" font-size="11.5">campaignId</text>
+            <text x="350" y="120" font-size="11.5">amountCents</text>
+            <text x="364" y="138" font-size="10.5" opacity=".6">net to the org</text>
+            <text x="350" y="158" font-size="11.5">feeCoveredCents</text>
+            <text x="364" y="176" font-size="10.5" opacity=".6">extra, paid on top</text>
+            <text x="350" y="196" font-size="11.5" fill="var(--accent)" font-weight="700">status</text>
+            <text x="350" y="216" font-size="11.5" fill="var(--accent)" font-weight="700">donorEmail</text>
+            <text x="350" y="236" font-size="11.5" opacity=".55">frequency · anonymous? · createdAt</text>
+
+            <!-- campaigns -> donations -->
+            <line x1="242" y1="118" x2="330" y2="118" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+            <text x="252" y="110" font-size="10.5" opacity=".7">has many</text>
+            <text x="248" y="134" font-size="11" font-weight="700">1</text>
+            <text x="316" y="134" font-size="11" font-weight="700">∞</text>
+
+            <!-- virtual donor -->
+            <rect x="676" y="120" width="208" height="106" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4" rx="2"/>
+            <text x="690" y="146" font-size="13" font-weight="700" fill="var(--accent)">Donor</text>
+            <text x="690" y="164" font-size="10.5" fill="var(--accent)" opacity=".85">not a table</text>
+            <text x="690" y="190" font-size="11.5">lowercase(donorEmail)</text>
+            <text x="690" y="212" font-size="10.5" opacity=".65">251 gifts → 223 donors</text>
+
+            <line x1="584" y1="173" x2="670" y2="173" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+            <text x="592" y="165" font-size="10.5" fill="var(--accent)">derived</text>
+
+            <!-- chatThreads -->
+            <rect x="14" y="316" width="228" height="112" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <rect x="14" y="316" width="228" height="30" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="28" y="336" font-size="13" font-weight="700">chatThreads</text>
+            <text x="28" y="366" font-size="11.5" opacity=".55">_id</text>
+            <text x="28" y="386" font-size="11.5">title</text>
+            <text x="28" y="406" font-size="11.5" opacity=".55">createdAt</text>
+
+            <!-- chatMessages -->
+            <rect x="336" y="292" width="248" height="160" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <rect x="336" y="292" width="248" height="30" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="350" y="312" font-size="13" font-weight="700">chatMessages</text>
+            <text x="350" y="342" font-size="11.5">threadId</text>
+            <text x="350" y="362" font-size="11.5">role</text>
+            <text x="364" y="380" font-size="10.5" opacity=".6">user | assistant | tool</text>
+            <text x="350" y="400" font-size="11.5">content</text>
+            <text x="350" y="420" font-size="11.5" fill="var(--accent)" font-weight="700">toolName · toolArgs</text>
+            <text x="364" y="438" font-size="10.5" opacity=".6">the audit trail</text>
+
+            <line x1="242" y1="372" x2="330" y2="372" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+            <text x="252" y="364" font-size="10.5" opacity=".7">has many</text>
+            <text x="248" y="388" font-size="11" font-weight="700">1</text>
+            <text x="316" y="388" font-size="11" font-weight="700">∞</text>
+
+            <text x="676" y="316" font-size="10.5" opacity=".7">Indexes on donations:</text>
+            <text x="676" y="336" font-size="10.5" opacity=".7">by_campaign · by_email</text>
+            <text x="676" y="354" font-size="10.5" opacity=".7">by_status · by_created</text>
+            <text x="676" y="382" font-size="10.5" opacity=".55">Deliberately unused —</text>
+            <text x="676" y="400" font-size="10.5" opacity=".55">see §04.</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        <strong>In this schema, a donor is a value rather than a row.</strong> The scaffold
+        provides no donors table and keys identity on <code>donorEmail</code>, so “unique
+        donors” means counting distinct normalised emails. Treat rows as people and you report
+        251 donors instead of 223. <code>status</code> and <code>donorEmail</code> are
+        highlighted because almost every correctness rule here comes back to one of them.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ══ 2. ARCHITECTURE ════════════════════════════════ -->
+  <section>
+    <div class="head">
+      <span class="eyebrow">02 · The load-bearing decision</span>
+      <h2>One aggregation layer, two consumers</h2>
+      <p class="prose">
+        The dashboard and the assistant call the same queries rather than keeping two
+        implementations in step by discipline. Everything funnels through one set of
+        deterministic queries before it splits.
+      </p>
+    </div>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 530" role="img"
+             aria-label="Layered flow: the donations table feeds scope filtering and status semantics; campaign metadata feeds the aggregation layer; four pure functions compute the analytics; those are exposed as six Convex queries, which both the dashboard and the assistant's six tools call.">
+          <defs>
+            <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+            <marker id="ar2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+            </marker>
+          </defs>
+          <g font-family="'Space Mono', monospace" fill="currentColor">
+
+            <!-- L1 tables -->
+            <text x="14" y="24" font-size="10" opacity=".55" letter-spacing="1.5">CONVEX TABLES</text>
+            <rect x="230" y="34" width="170" height="40" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="315" y="59" font-size="12" text-anchor="middle">donations</text>
+            <rect x="640" y="34" width="170" height="40" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="725" y="59" font-size="12" text-anchor="middle">campaigns</text>
+
+            <line x1="315" y1="74" x2="311" y2="108" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+            <text x="120" y="96" font-size="10.5" opacity=".6">full collect — see §04</text>
+
+            <line x1="725" y1="74" x2="725" y2="186" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+            <text x="738" y="130" font-size="10" opacity=".6">labels + goals</text>
+
+            <!-- L2 spine -->
+            <text x="14" y="140" font-size="10" opacity=".55" letter-spacing="1.5">SPINE</text>
+            <rect x="196" y="112" width="230" height="60" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="311" y="132" font-size="11.5" text-anchor="middle" font-weight="700">Scope</text>
+            <text x="311" y="148" font-size="10.5" text-anchor="middle">filterDonationsByScope</text>
+            <text x="311" y="163" font-size="9.5" text-anchor="middle" opacity=".65">campaign + date · no status rule</text>
+
+            <rect x="446" y="112" width="230" height="60" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" rx="2"/>
+            <text x="561" y="132" font-size="11.5" text-anchor="middle" font-weight="700" fill="var(--accent)">Status semantics</text>
+            <text x="561" y="148" font-size="10.5" text-anchor="middle">countsAsRaised · partitionByStatus</text>
+            <text x="561" y="163" font-size="9.5" text-anchor="middle" opacity=".65">only succeeded counts as raised</text>
+
+            <line x1="426" y1="142" x2="440" y2="142" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+            <!-- fan-out to the four pure functions -->
+            <line x1="561" y1="172" x2="561" y2="190" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="276" y1="190" x2="791" y2="190" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="276" y1="190" x2="276" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+            <line x1="446" y1="190" x2="446" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+            <line x1="616" y1="190" x2="616" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+            <line x1="791" y1="190" x2="791" y2="202" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+            <!-- L3 pure fns -->
+            <text x="14" y="228" font-size="10" opacity=".55" letter-spacing="1.5">PURE</text>
+            <text x="14" y="244" font-size="10" opacity=".55" letter-spacing="1.5">FUNCTIONS</text>
+            <rect x="196" y="206" width="160" height="52" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="276" y="228" font-size="11" text-anchor="middle">computeStats</text>
+            <text x="276" y="245" font-size="9.5" text-anchor="middle" opacity=".6">scalars</text>
+            <rect x="366" y="206" width="160" height="52" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="446" y="228" font-size="11" text-anchor="middle">computeBreakdown</text>
+            <text x="446" y="245" font-size="9.5" text-anchor="middle" opacity=".6">groups</text>
+            <rect x="536" y="206" width="160" height="52" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="616" y="228" font-size="11" text-anchor="middle">computeTimeseries</text>
+            <text x="616" y="245" font-size="9.5" text-anchor="middle" opacity=".6">buckets</text>
+            <rect x="706" y="206" width="170" height="52" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="791" y="228" font-size="11" text-anchor="middle">computeDonorRollup</text>
+            <text x="791" y="245" font-size="9.5" text-anchor="middle" opacity=".6">people</text>
+            <text x="196" y="278" font-size="10" opacity=".6">no ctx · no db · unit-tested against the 283-row replica</text>
+
+            <line x1="498" y1="290" x2="498" y2="316" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+            <!-- L4 queries -->
+            <text x="14" y="344" font-size="10" opacity=".55" letter-spacing="1.5">QUERIES</text>
+            <rect x="120" y="322" width="756" height="62" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2" rx="2"/>
+            <text x="136" y="344" font-size="11.5" font-weight="700" fill="var(--accent)">convex/reporting.ts</text>
+            <text x="136" y="368" font-size="10.5">stats · breakdown · timeseries · topDonors · recentDonations · campaigns</text>
+            <text x="672" y="344" font-size="10" opacity=".7">one shared set of</text>
+            <text x="672" y="360" font-size="10" opacity=".7">deterministic queries,</text>
+            <text x="672" y="376" font-size="10" opacity=".7">applying the same rule</text>
+
+            <!-- split -->
+            <line x1="300" y1="384" x2="285" y2="428" stroke="var(--accent)" stroke-width="2" marker-end="url(#ar2a)"/>
+            <line x1="700" y1="384" x2="711" y2="428" stroke="var(--accent)" stroke-width="2" marker-end="url(#ar2a)"/>
+            <text x="180" y="410" font-size="10.5" fill="var(--accent)">useQuery</text>
+            <text x="722" y="410" font-size="10.5" fill="var(--accent)">ctx.runQuery</text>
+
+            <!-- L5 consumers -->
+            <text x="14" y="462" font-size="10" opacity=".55" letter-spacing="1.5">SURFACES</text>
+            <rect x="120" y="434" width="330" height="72" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="285" y="458" font-size="12" text-anchor="middle" font-weight="700">Dashboard</text>
+            <text x="285" y="477" font-size="10" text-anchor="middle" opacity=".65">overview · campaign detail · donors</text>
+            <text x="285" y="494" font-size="10" text-anchor="middle" opacity=".65">renders, never computes</text>
+
+            <rect x="546" y="434" width="330" height="72" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="711" y="458" font-size="12" text-anchor="middle" font-weight="700">AI assistant</text>
+            <text x="711" y="477" font-size="10" text-anchor="middle" opacity=".65">6 tools, one per result shape</text>
+            <text x="711" y="494" font-size="10" text-anchor="middle" opacity=".65">picks questions, never arithmetic</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        <strong>The split happens as late as possible.</strong> The Convex action cannot
+        access <code>ctx.db</code> directly, and the current assistant tools only expose
+        constrained reporting queries rather than raw donation rows. What this rules out is a
+        second, AI-side implementation of the maths: when the assistant says
+        <span class="mono">$66,705.00</span>, that figure comes from the same reporting code
+        that supplies the dashboard tile. What it does <em>not</em> rule out is the model
+        choosing the wrong tool, passing the wrong arguments, or misstating a correct result —
+        which is exactly why every tool call is shown in the UI.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ══ 3. AGENT LOOP ══════════════════════════════════ -->
+  <section>
+    <div class="head">
+      <span class="eyebrow">03 · Question to answer</span>
+      <h2>How the assistant answers</h2>
+      <p class="prose">
+        The model cannot run code. It names a tool, the server runs it, the result goes back,
+        and it either asks again or concludes. Campaign questions take two rounds because the
+        user says “the meal drive” and the tools need an id.
+      </p>
+    </div>
+
+    <figure>
+      <div class="canvas">
+        <svg viewBox="0 0 900 462" role="img"
+             aria-label="Sequence diagram with three lanes. The model asks for list_campaigns to turn campaign names into ids, the result is saved to chatMessages and returned; then it asks for get_campaign_breakdown scoped to March, which is likewise saved and returned; the model then states the answer. Saved tool calls are never replayed back to the model.">
+          <defs>
+            <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g font-family="'Space Mono', monospace" fill="currentColor">
+
+            <!-- lane headers -->
+            <rect x="170" y="50" width="160" height="40" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="250" y="68" font-size="11.5" text-anchor="middle" font-weight="700">Model</text>
+            <text x="250" y="82" font-size="9" text-anchor="middle" opacity=".6">no data of its own</text>
+
+            <rect x="430" y="50" width="230" height="40" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" rx="2"/>
+            <text x="545" y="68" font-size="11.5" text-anchor="middle" font-weight="700" fill="var(--accent)">Tools</text>
+            <text x="545" y="82" font-size="9" text-anchor="middle" opacity=".7">→ convex/reporting.ts</text>
+
+            <rect x="722" y="50" width="164" height="40" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="804" y="68" font-size="11.5" text-anchor="middle" font-weight="700">chatMessages</text>
+            <text x="804" y="82" font-size="9" text-anchor="middle" opacity=".6">audit trail</text>
+
+            <!-- lifelines -->
+            <line x1="250" y1="90" x2="250" y2="368" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".45"/>
+            <line x1="545" y1="90" x2="545" y2="368" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".45"/>
+            <line x1="804" y1="90" x2="804" y2="368" stroke="currentColor" stroke-width="1" stroke-dasharray="3 4" opacity=".45"/>
+
+            <!-- question -->
+            <rect x="14" y="108" width="132" height="42" fill="var(--raised)" stroke="currentColor" stroke-width="1.5" rx="2"/>
+            <text x="80" y="126" font-size="10.5" text-anchor="middle" font-weight="700">Question</text>
+            <text x="80" y="141" font-size="9" text-anchor="middle" opacity=".65">“…in March?”</text>
+            <line x1="146" y1="129" x2="244" y2="129" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+            <!-- round 1 -->
+            <text x="14" y="182" font-size="9.5" font-weight="700" fill="var(--accent)" letter-spacing="1">ROUND 1</text>
+            <line x1="250" y1="186" x2="539" y2="186" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+            <text x="395" y="178" font-size="10.5" text-anchor="middle">list_campaigns</text>
+
+            <line x1="545" y1="214" x2="798" y2="214" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar3)"/>
+            <text x="672" y="206" font-size="9.5" text-anchor="middle" opacity=".7">saved as it runs</text>
+
+            <line x1="545" y1="242" x2="256" y2="242" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar3)"/>
+            <text x="395" y="234" font-size="10.5" text-anchor="middle" opacity=".8">campaign ids</text>
+
+            <!-- round 2 -->
+            <text x="14" y="290" font-size="9.5" font-weight="700" fill="var(--accent)" letter-spacing="1">ROUND 2</text>
+            <line x1="250" y1="294" x2="539" y2="294" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+            <text x="395" y="279" font-size="10.5" text-anchor="middle">get_campaign_breakdown</text>
+            <text x="395" y="291" font-size="9" text-anchor="middle" opacity=".6">2 ids · 2026-03-01→03-31</text>
+
+            <line x1="545" y1="322" x2="798" y2="322" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar3)"/>
+            <text x="672" y="314" font-size="9.5" text-anchor="middle" opacity=".7">saved as it runs</text>
+
+            <line x1="545" y1="350" x2="256" y2="350" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar3)"/>
+            <text x="395" y="342" font-size="10.5" text-anchor="middle" opacity=".8">$7,710.00 / $3,785.00</text>
+
+            <!-- answer -->
+            <line x1="250" y1="368" x2="250" y2="388" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+            <rect x="100" y="394" width="392" height="56" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" rx="2"/>
+            <text x="116" y="414" font-size="10.5" fill="var(--accent)" font-weight="700">Answer</text>
+            <text x="116" y="431" font-size="10">Legal Defense Fund $7,710.00 (24 gifts)</text>
+            <text x="116" y="445" font-size="10">Winter Meal Drive $3,785.00 (14 gifts)</text>
+
+            <!-- note -->
+            <text x="722" y="400" font-size="9.5" opacity=".6">Saved calls are never</text>
+            <text x="722" y="414" font-size="9.5" opacity=".6">replayed to the model —</text>
+            <text x="722" y="428" font-size="9.5" opacity=".6">figures go stale.</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>
+        <strong>Two rounds, not one.</strong> A question with no campaign named — “how much did
+        we raise last month?” — resolves in a single round. Tool calls are persisted the moment
+        they run, which is both the audit trail and, because the client subscribes to that
+        table, live progress without building streaming.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ══ 4. RULES ═══════════════════════════════════════ -->
+  <section>
+    <div class="head">
+      <span class="eyebrow">04 · Where the money breaks</span>
+      <h2>Rules that protect the figures</h2>
+      <p class="prose">
+        Each of these produces a plausible number when it is broken. That is what makes them
+        dangerous — a wrong total still looks like a total.
+      </p>
+    </div>
+
+    <div class="rules">
+      <div class="rule"><span class="k">R1</span><span class="b"><span class="t">Only <code>succeeded</code> is raised</span><span class="d">Defined once in <code>convex/lib/status.ts</code> — <code>countsAsRaised</code> and <code>partitionByStatus</code> — and applied consistently by every reporting function. Pending, failed and refunded never count. 32 rows, worth $7,710.00, exist in the seed specifically to catch a naive sum.</span></span></div>
+      <div class="rule"><span class="k">R2</span><span class="b"><span class="t">Status is never an input</span><span class="d">Callers narrow <em>which rows</em> — campaign, date. They cannot change <em>what raised means</em>. Failed and pending come back as their own named figures instead.</span></span></div>
+      <div class="rule"><span class="k">R3</span><span class="b"><span class="t">Fees are not raised</span><span class="d"><code>amountCents</code> is what the org receives; <code>feeCoveredCents</code> is extra the donor paid on top. Raised and charged are different numbers.</span></span></div>
+      <div class="rule"><span class="k">R4</span><span class="b"><span class="t">In this take-home, donor identity is a normalised email</span><span class="d">That comes from the provided data model — the schema has no donors table and keys on <code>donorEmail</code> — not from a general recommendation to identify people by email. Lowercased and trimmed on read. Per-campaign donor counts deliberately do not sum to the org total: 227 across campaigns, 223 overall.</span></span></div>
+      <div class="rule"><span class="k">R5</span><span class="b"><span class="t">Empty buckets are emitted</span><span class="d">47 of 180 days have no gift. Returning only days that have rows closes the gaps and misdraws the trend.</span></span></div>
+      <div class="rule"><span class="k">R6</span><span class="b"><span class="t">Goal progress is lifetime</span><span class="d">A goal is a cumulative target, so filtering to March must not move it. The field is named <code>lifetimeGoalProgressPct</code> so it cannot be read as scoped.</span></span></div>
+      <div class="rule"><span class="k">R7</span><span class="b"><span class="t">Anonymity is stored per gift, resolved per donor</span><span class="d">Three levels worth separating. <strong>Storage:</strong> <code>anonymous</code> is a flag on each donation. <strong>Derivation:</strong> donor-level display anonymity is computed on read, never stored. <strong>Product assumption:</strong> a donor is shown anonymously only if <em>every</em> succeeded gift is anonymous — two seeded donors gave both ways and resolve to named. The money always counts; only the name is withheld.</span></span></div>
+      <div class="rule"><span class="k">R8</span><span class="b"><span class="t">Ordering is deterministic</span><span class="d">32 donors tie at exactly $1,000.00. Without a stable tiebreak the dashboard and the assistant each pick a different #7.</span></span></div>
+    </div>
+
+    <div class="callout">
+      <span class="eyebrow">Known-wrong values</span>
+      <p>
+        These are recorded as regression guards. If a test ever produces one, the assertion
+        message names the rule that broke.
+      </p>
+      <div class="tablewrap" style="margin-top:6px">
+        <table>
+          <thead>
+            <tr><th>Wrong</th><th>What it actually is</th><th class="num">Correct</th><th>Rule</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono bad">$74,415.00</td><td>Sum over all 283 rows</td><td class="num ok">$66,705.00</td><td>R1</td></tr>
+            <tr><td class="mono bad">$67,928.38</td><td>Raised plus donor-covered fees</td><td class="num ok">$66,705.00</td><td>R3</td></tr>
+            <tr><td class="mono bad">253</td><td>Distinct emails across all statuses</td><td class="num ok">223</td><td>R1 · R4</td></tr>
+            <tr><td class="mono bad">251</td><td>Succeeded rows counted as people</td><td class="num ok">223</td><td>R4</td></tr>
+            <tr><td class="mono bad">283</td><td>All rows counted as donations</td><td class="num ok">251</td><td>R1</td></tr>
+            <tr><td class="mono bad">30.8%</td><td>March raised over a lifetime goal</td><td class="num ok">171.8%</td><td>R6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 5. VERIFIED ════════════════════════════════════ -->
+  <section>
+    <div class="head">
+      <span class="eyebrow">05 · Ground truth</span>
+      <h2>Verified figures</h2>
+      <p class="prose">
+        The seed is a deterministic PRNG with a fixed epoch, so the dataset can be rebuilt
+        outside the database and compared field by field. All 283 rows match.
+      </p>
+    </div>
+
+    <div class="cards">
+      <div class="card"><span class="eyebrow">Total raised</span><span class="v">$66,705.00</span><span class="n">succeeded only, all campaigns</span></div>
+      <div class="card"><span class="eyebrow">Donations</span><span class="v">251</span><span class="n">of 283 rows</span></div>
+      <div class="card"><span class="eyebrow">Unique donors</span><span class="v">223</span><span class="n">distinct normalised email</span></div>
+      <div class="card"><span class="eyebrow">Average gift</span><span class="v">$265.76</span><span class="n">median $100.00</span></div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Campaign</th><th>Status</th><th class="num">Raised</th><th class="num">Gifts</th><th class="num">Donors</th><th class="num">Goal</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Legal Defense Fund</td><td>active</td><td class="num">$42,940.00</td><td class="num">154</td><td class="num">137</td><td class="num">171.8%</td></tr>
+          <tr><td>Winter Meal Drive</td><td>active</td><td class="num">$15,920.00</td><td class="num">67</td><td class="num">60</td><td class="num">199.0%</td></tr>
+          <tr><td>Scholarship Endowment</td><td>active</td><td class="num">$7,275.00</td><td class="num">26</td><td class="num">26</td><td class="num">—</td></tr>
+          <tr><td>Emergency Relief</td><td>ended</td><td class="num">$570.00</td><td class="num">4</td><td class="num">4</td><td class="num">1.1%</td></tr>
+          <tr><td>Untitled draft</td><td>draft</td><td class="num">$0.00</td><td class="num">0</td><td class="num">0</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="prose" style="color:var(--ink2);font-size:0.9rem">
+      Two campaigns are over goal, one has no goal at all, and one has never received a gift.
+      Each is an empty state the dashboard has to render without a blank or a
+      <span class="mono">NaN</span>. The data ends 2026-06-29, so any recent window correctly
+      returns zero — which is what makes “how much did we raise last month?” the sharpest
+      test of whether the assistant declines or invents.
+    </p>
+  </section>
+
+  <footer>
+    <p><strong>Read strategy.</strong> Every query collects the whole donations table; the
+      indexes shown in §01 are deliberately unused. <code>computeStats</code> takes the
+      unscoped rows so its <code>coverage</code> field can report the dataset's real bounds
+      even when the scope matches nothing — an indexed range read for an empty July returns
+      no rows, and that guarantee would silently disappear. Correct and instant at 283 rows;
+      it will not survive hundreds of thousands.</p>
+    <p style="margin-top:8px">Crescent take-home · Track B · reporting surface and assistant</p>
+  </footer>
+
+</div>

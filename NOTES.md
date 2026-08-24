@@ -1,817 +1,374 @@
-# NOTES.md
+# NOTES
 
-Working notes for the Crescent take-home. Kept as I go.
-
-> **Status legend:** `[VERIFIED]` = matched against rows actually read out of Convex.
->
-> **All baseline figures below are VERIFIED.** `scripts/verify-baseline.mjs` read all
-> 283 rows out of deployment `dev:acoustic-dodo-759` and diffed them field-by-field
-> against the offline replica: **every field of every row is identical**, and all five
-> headline figures match. Re-run any time with `node scripts/verify-baseline.mjs`.
+Crescent take-home, Track B: the staff-facing reporting surface and an AI
+assistant that answers questions about fundraising.
 
 ---
 
-## 0. Repo state as found
+## 1. What this is
 
-- Next.js 15 (App Router) + React 19 + Tailwind 3 + Convex 1.27. `@anthropic-ai/sdk`
-  is already a dependency, so an assistant track is anticipated.
-- `app/page.tsx` is a placeholder. There is no dashboard, no admin route, no chat UI.
-- Implemented server functions: `campaigns:getBySlug`, `campaigns:listAll`,
-  `donations:create`, `donations:listByCampaign`, `seed:run`.
-- Stubs that throw `Not implemented`: `campaigns:update`, `donations:stats`,
-  `donations:timeseries`.
-- **The brief lives outside the repo** at `takehome-brief.md` in the main working
-  tree, gitignored. Scope is authoritative and confirmed:
+**Built:**
 
-### Scope (from the brief)
+- `/dashboard` — total raised, donation count, unique donors, average gift; money
+  over time with a switchable range and day/week/month granularity; breakdown by
+  campaign; recent donations.
+- `/dashboard/campaigns/[id]` — the same shape scoped to one campaign, plus goal
+  progress.
+- `/dashboard/donors` — who gave, lifetime total, gift count, first and last gift.
+  Sortable, searchable, filterable to repeat donors.
+- `/dashboard/assistant` — six tools over the same reporting queries, persisted
+  conversations, every tool call visible and expandable in the UI.
+- `convex/donations.ts → stats` and `timeseries`, the two stubs the brief names.
+- 88 tests, no test-runner dependency.
 
-**Own:** the staff-facing reporting surface + an AI fundraising assistant.
+**Deliberately not built:** auth, real payments, embeddings, streaming. The first
+three are listed as not required; streaming was cut on the brief's own terms —
+*"streaming if you can, not at the cost of correctness."*
 
-1. **Dashboards** — `/dashboard` (total raised, donation count, unique donors,
-   average gift; money over time charted with a switchable range; breakdown by
-   campaign; recent donations). `/dashboard/campaigns/[id]` — same shape, one
-   campaign. `/dashboard/donors` — who gave, total, how many times, last gift;
-   sortable + searchable.
-2. **`convex/donations.ts` → `stats` and `timeseries`.**
-3. **Agent at `/dashboard/assistant`** — must handle the five questions in §7.
-   Model reaches data through **tools with real schemas**, never rows pasted into
-   the prompt. Conversations persist via `chatThreads`/`chatMessages` including
-   which tool ran with what args. **Tool calls visible in the UI.** Must refuse
-   gracefully. Streaming only if it does not cost correctness.
-
-**Assessed on:** are the numbers right (dominates) · where aggregation happens ·
-tool design (neither one god-tool nor one-tool-per-question) · debuggability
-(model error vs tool error) · no layout reflow on data arrival · empty states.
-
-**Explicitly not required:** auth, real payments, embeddings/vector store, voice,
-multi-user chat.
-
-> The brief's own instruction: *"the agent's tools should call the same aggregates
-> the dashboard uses, or you'll write the aggregation twice and they'll disagree."*
-> This is the architecture constraint, stated by the client, not inferred.
+**The thesis:** one reporting layer, two consumers. The dashboard and the
+assistant call the same deterministic queries, so there is no separate AI-side
+implementation of the fundraising maths.
 
 ---
 
-## 1. How I established the baseline
-
-`convex/seed.ts` is fully deterministic: a mulberry32 PRNG seeded with `42`, a fixed
-epoch `T0 = 1767225600000` (2026-01-01T00:00:00Z), no `Date.now()`, no I/O.
-
-That means the dataset can be reproduced **outside the database**. I wrote a
-standalone replica that mirrors the seed's `rand()` call order exactly — including
-JS object-literal property evaluation order, which matters because
-`feeCoveredCents`, `frequency`, `anonymous`, `note`, `dedication` and `createdAt`
-each consume from the same PRNG stream in source order.
-
-This gives two independent computations of every figure: the replica, and whatever
-the server-side aggregation later returns. They must agree exactly. If they diverge,
-the aggregation is wrong — that is the whole point of doing it twice.
-
----
-
-## 2. Verified baseline figures
-
-### 2.1 Status breakdown — all 283 rows `[VERIFIED]`
-
-| status | rows | Σ amountCents | Σ feeCoveredCents |
-|---|---:|---:|---:|
-| succeeded | 251 | $66,705.00 | $1,223.38 |
-| pending | 8 | $3,105.00 | $90.24 |
-| failed | 16 | $2,595.00 | $74.96 |
-| refunded | 8 | $2,010.00 | $31.35 |
-| **all rows** | **283** | **$74,415.00** | **$1,419.93** |
-
-### 2.2 Headline numbers — `succeeded` only `[VERIFIED]`
-
-| metric | value | in cents |
-|---|---:|---:|
-| Total raised (net to org) | **$66,705.00** | 6,670,500 |
-| Fees covered by donors | $1,223.38 | 122,338 |
-| Total charged to cards | $67,928.38 | 6,792,838 |
-| Donation count | **251** | |
-| Unique donors (distinct email) | **223** | |
-| Average gift (raised ÷ count) | **$265.76** | 26,575.6972 exact |
-| Median gift | $100.00 | |
-| Average per donor (raised ÷ donors) | $299.13 | |
-
-Reconciliation of the donor count: 223 unique = 220 one-gift donors + 3 repeat
-donors, and 220 + 31 repeat gifts = 251 succeeded rows. ✔
-
-### 2.3 Per campaign — `succeeded` only `[VERIFIED]`
-
-| campaign | gifts | raised | fees | donors | goal | progress |
-|---|---:|---:|---:|---:|---:|---:|
-| legal-defense-fund | 154 | $42,940.00 | $817.59 | 137 | $25,000 | 171.8% |
-| winter-meal-drive | 67 | $15,920.00 | $297.02 | 60 | $8,000 | 199.0% |
-| scholarship-endowment | 26 | $7,275.00 | $91.63 | 26 | *none* | **N/A** |
-| emergency-relief-2025 (ended) | 4 | $570.00 | $17.14 | 4 | $50,000 | 1.1% |
-| untitled-draft | 0 | $0.00 | $0.00 | 0 | *none* | **N/A** |
-
-### 2.4 Repeat donors `[VERIFIED]`
-
-Exactly 3 donors give more than once, all of them the emails hardcoded in the seed.
-
-| email | succeeded gifts | lifetime | all rows |
-|---|---:|---:|---:|
-| wei.kim@example.org | 13 | $3,110.00 | 15 (1 failed, 1 refunded) |
-| amina.haddad@example.org | 11 | $3,435.00 | 11 |
-| marcus.silva@example.org | 7 | $775.00 | 7 |
-
-I checked for accidental PRNG collisions in the generated emails (16 first names ×
-8 surnames × 900 digits): **zero**. So repeat-donor logic can be validated against
-exactly these three, and `wei.kim` is the useful one — it is the only donor whose
-repeat count *changes* depending on whether you filter to `succeeded` (13) or not (15).
-
----
-
-## 3. Data-model rules that decide correctness
-
-1. **Only `succeeded` counts as raised.** `pending`, `failed`, `refunded` all exist
-   in the seed specifically to catch a naive `SUM`. Summing everything reports
-   $74,415.00 — **$7,710.00 too much**.
-2. **`amountCents` is net to the org; `feeCoveredCents` is extra the donor paid on
-   top.** Raised = Σ `amountCents`. Charged = Σ (`amountCents` + `feeCoveredCents`).
-   Adding fees into "raised" inflates it by $1,223.38.
-3. **`feeCoveredCents = 0` is normal, not missing.** 112 of 251 succeeded rows are 0
-   (44.6%). Treating 0 as null/absent and back-filling an estimate would be wrong.
-   Where non-zero it is exactly `Math.round(amountCents * 0.029) + 30` — verified on
-   all 251 rows.
-4. **A donor is a lowercased email, not a row.** 251 rows → 223 people. `donations:create`
-   lowercases and trims on write, but aggregation must not *assume* that: the seed
-   writes rows directly, bypassing `create`. Normalize on read too.
-5. **`refunded` is not the same as `failed`.** Both are excluded from raised, but a
-   refund is money that arrived and went back; a failure never arrived. If net
-   revenue ever needs to be shown, refunds subtract and failures do not.
-6. **`anonymous` is a display flag only.** 18 succeeded rows are anonymous ($5,630).
-   They still carry a real name and email and must still count toward totals and
-   donor dedup — the bug is leaking the identity to the client, not counting it.
-   Note 2 emails appear *both* anonymously and named, so "is this donor anonymous"
-   is a per-gift question, not a per-donor one.
-7. **`monthly` is one recorded gift, not a subscription.** 53 succeeded monthly rows
-   ($12,850). There is no schedule/subscription table, so MRR cannot be derived
-   without inventing an assumption. I will not present one as if it were measured.
-8. **Absent ≠ false for campaign settings.** Per `schema.ts`, an absent toggle means
-   SHOWN; only an explicit `false` hides. `?? true`, never `!!`.
-9. **`goalCents` is optional.** `scholarship-endowment` and `untitled-draft` have
-   none. Percent-to-goal must be `null`, not `NaN`, `Infinity`, or `0%`.
-
----
-
-## 4. Edge cases and traps found
-
-- **The seed comment says "~420 gifts". The seed actually produces 283.**
-  `perDay = Math.floor(rand() * 4)` averages 1.5/day × 180 days ≈ 270, plus the
-  ended-campaign `continue`. The comment is stale — **confirmed against the live
-  database, which holds exactly 283 rows.** Trusting the comment as an expected row
-  count would send you hunting a nonexistent bug.
-- **All seed data is in the past.** Range is 2026-01-01 → 2026-06-29. Today is
-  2026-08-22, so the newest donation is **53 days old**. Consequences:
-  - "Last 7 days" → **0 gifts, $0**
-  - "Last 30 days" → **0 gifts, $0**
-  - "Last 90 days" → 36 gifts, $11,240
-  A dashboard defaulting to a 30-day window renders completely empty and looks
-  broken. This is a presentation decision, not a bug to patch: I need a default
-  range that actually contains data, plus a genuine empty state.
-- **44 of 180 days have no donations.** A timeseries must emit explicit zero
-  buckets; grouping only over present rows silently compresses the gaps and
-  misdraws the trend.
-- **Timezone materially changes the buckets.** `createdAt` is epoch ms. Re-bucketing
-  the 251 succeeded rows by local calendar day moves: 46 rows in America/Toronto
-  (18%), 86 in America/Los_Angeles, 87 in Asia/Tokyo. Distinct day counts shift from
-  133 (UTC) to 142 (Toronto). Daily totals are **not** timezone-stable and the choice
-  must be stated, not implied. The very first row, 2026-01-01T00:39:03Z, lands on
-  2025-12-31 in Toronto — a different year.
-- **Both live campaigns are over goal** (171.8%, 199.0%). Progress bars must clamp
-  the *bar* at 100% while still reporting the true percentage.
-- **Mean is 2.6× median** ($265.76 vs $100.00) — the $1,000 tier is 35 gifts but
-  $35,000 of the $66,705. A lone "average gift" tile is misleading; median belongs
-  next to it.
-- **`donations:listByCampaign` collects every row unpaginated.** Fine at 283, a real
-  problem at 400,000. Flagged in the file's own comment. Decision pending.
-- **`seed:run` writes `succeeded` rows directly**, bypassing `donations:create`,
-  which can only ever produce `pending`. So there is no code path in the repo that
-  legitimately transitions a donation to `succeeded`. Worth noting before assuming
-  the lifecycle is implemented anywhere.
-
----
-
-## 5. Open questions / ambiguities
-
-Recorded rather than silently resolved:
-
-1. **Which timezone?** Nothing in the repo states one. Leaning UTC because
-   `createdAt` is epoch ms and the seed epoch is UTC midnight, which makes seed day
-   index == UTC calendar day exactly — reproducible and explainable. A real nonprofit
-   would want its own local timezone. To be decided explicitly and written down.
-2. **Does "total raised" include donor-covered fees?** Schema says net to org is
-   `amountCents`, so raised = `amountCents`. I will show "total charged" as a
-   separate secondary figure rather than folding it in.
-3. **Should refunds reduce raised, or be excluded?** Excluding is what the schema
-   comment says ("must not count pending or failed"; refunded is listed alongside).
-   Excluding and subtracting give the same $66,705 here only because refunded rows
-   were never in the succeeded set. Stating the rule as "raised = Σ succeeded" is
-   unambiguous.
-4. **Do ended/draft campaigns belong in org-wide totals?** `emergency-relief-2025`
-   contributes $570. Including it changes the headline. Undecided.
-5. **Unique donors — org-wide or per campaign?** These do not sum: 137 + 60 + 26 + 4
-   = 227 across campaigns but 223 org-wide, because some donors gave to more than
-   one campaign. Any UI showing both must not imply they add up.
-
----
-
-## 6. Decisions log
-
-> Entries marked **[KEEP]** carry through to the final NOTES.md rewrite (§11).
-> Everything else in this file is working scratch.
-
-### D8 — The assistant runs in a Convex action, not a Next route **[KEEP]**
-
-**Decision.** The agent loop lives in `convex/agent/chat.ts`, a Convex action, and
-its credential is a Convex deployment environment variable. This deviates from
-README.md, which says to put the API key in `.env.local`.
-
-**Why the deviation is forced by the choice.** `.env.local` is read by Next.js on
-the developer's machine. A Convex action executes on Convex's servers, so
-`process.env` inside it resolves against the deployment. A key in `.env.local`
-would simply be invisible. The README's instruction presumes the Anthropic call
-happens in the Next process — a route handler or server action — which is a
-legitimate design we did not choose.
-
-**Why we chose the action anyway.**
-- Every other piece of backend logic in this app is a Convex function. One Next
-  route for the single external call is architecturally inconsistent.
-- Convex actions tolerate a multi-turn tool loop; typical serverless route
-  timeouts (10–60s) are a poor fit for one.
-- `ctx.runQuery` is in-process — no second client, no HTTP hop, no extra
-  serialization boundary between the agent and the queries it calls.
-- `appendMessage` stays an `internalMutation`, unreachable from outside Convex.
-
-**Honest accounting of what this does NOT buy.** Two arguments made in favour of
-this during development were overstated and are corrected here:
-1. *"The one-implementation guarantee is structural."* It is not. A Next route
-   using `ConvexHttpClient` would call the identical `api.reporting.*` functions.
-   The guarantee comes from the tool surface, not from the runtime.
-2. *"Internal mutations keep the chat tables shut."* Weak: `addUserMessage` is
-   already a public mutation, so the tables are already writable from outside.
-
-**Rejected alternative.** Next route handler with the key in `.env.local`,
-matching the README literally. The real cost of not choosing it is reviewer
-friction: someone following the README puts the key in `.env.local`, gets "not
-configured", and has to read NOTES.md to find out why. Mitigated by an error
-message that names the exact command, and by run instructions in §15.
-
-**Reversible.** Roughly 45 minutes: move the loop to `app/api/assistant/route.ts`,
-swap `ctx.runQuery` for `ConvexHttpClient`, make the chat mutations public.
-
-### D9 — Goal progress is lifetime, never scoped to the range **[KEEP]**
-
-`goalProgressPct` is computed from a campaign's **lifetime** raised, deliberately
-ignoring any date range in the scope.
-
-Found while verifying the assistant against BASELINE.md. Scoped to March, the
-Legal Defense Fund reported **30.8%** of goal; it is actually at **171.8%**. The
-old code divided a range-scoped numerator by a lifetime denominator — a number
-that is plausible, prominent, and wrong, which is precisely the failure mode this
-codebase is built to avoid.
-
-A goal is a cumulative target. Filtering the view to March must not move it.
-Groups now also return `lifetimeRaised` so the percentage is auditable rather
-than something you have to trust.
-
-Worth noting how it surfaced: the **assistant flagged it unprompted**, adding
-"note the goal progress figures shown here are cumulative to date, not
-March-only" to its answer. Its explanation was backwards — the figure was
-March-only over a lifetime goal, not cumulative — but it noticed the field was
-inconsistent with the question being asked. Two tests now pin the behaviour.
-
----
-
-## 7. Baselines for the five required agent questions `[VERIFIED]`
-
-These are acceptance criteria, so each has a known-good answer written down before
-any code exists.
-
-### Q1 "How much did we raise last month?" → **$0.00**
-
-Today is 2026-08-22, so "last month" = **2026-07**. The data ends 2026-06-29.
-There are zero donations in July.
-
-| month | raised | gifts |
-|---|---:|---:|
-| 2026-01 | $13,475.00 | 52 |
-| 2026-02 | $10,525.00 | 42 |
-| 2026-03 | $13,645.00 | 42 |
-| 2026-04 | $10,055.00 | 44 |
-| 2026-05 | $9,425.00 | 41 |
-| 2026-06 | $9,580.00 | 30 |
-
-This is *the* test case for graceful refusal. The brief: "an assistant that invents
-a number is worse than one that declines, because a plausible invented number gets
-pasted into a board report." A naive agent either hallucinates a figure or divides
-by zero computing an average over an empty set. Correct behaviour: state plainly
-that there was no activity in that period, and ideally name the actual data range.
-
-### Q2 "Which campaign is doing best?" → **ambiguous, must be disclosed**
-
-| campaign | raised | gifts | donors | avg gift | % of goal |
-|---|---:|---:|---:|---:|---:|
-| legal-defense-fund | $42,940.00 | 154 | 137 | $278.83 | 171.8% |
-| winter-meal-drive | $15,920.00 | 67 | 60 | $237.61 | **199.0%** |
-| scholarship-endowment | $7,275.00 | 26 | 26 | $279.81 | no goal |
-| emergency-relief-2025 | $570.00 | 4 | 4 | $142.50 | 1.1% |
-
-By raised → legal-defense-fund. By % of goal → winter-meal-drive. Both defensible.
-The agent must say which metric it used; picking silently is guessing.
-
-### Q3 "Who are our top 10 donors?" -> tie broken by email
-
-Ranks 1-2 are unambiguous (amina.haddad $3,435, wei.kim $3,110). **32 donors are
-tied at exactly $1,000**, so ranks 3-10 are arbitrary without a deterministic
-secondary sort. `computeDonorRollup` tiebreaks on email ascending; the resolved
-top 10 is in BASELINE.md. Both top donors have anonymous gifts and both correctly
-resolve to *named*, because a donor is anonymous only if every gift was.
-
-### Q4 "How many people gave more than once?" → **3**
-
-wei.kim, amina.haddad, marcus.silva (succeeded-only).
-
-Honest caveat: this returns 3 **whether or not** the status filter is applied,
-because wei.kim's failed and refunded rows introduce no new person. So this
-question does *not* catch a missing status filter. The per-donor gift *count* does:
-wei.kim is 13 succeeded of 15 rows. Do not treat a correct "3" as evidence the
-filter works.
-
-### Q5 "Did the meal drive do better than the legal fund in March?" → **no**
-
-| campaign | March 2026 raised | gifts | donors |
-|---|---:|---:|---:|
-| legal-defense-fund | $7,710.00 | 24 | 24 |
-| winter-meal-drive | $3,785.00 | 14 | 12 |
-
-Legal fund by **$3,925.00**. "March" is unambiguous here — 2026-03 is the only
-March in the dataset — but the agent should still resolve and echo the concrete
-date range it used.
-
----
-
-## 8. Setup decisions
-
-- **Convex deployment: cloud account, not anonymous/local.** README assumes it
-  ("you will create your own free Convex account"); the web dashboard is directly
-  useful for hand-verifying totals as the brief requires; the agent needs a
-  server-side `ANTHROPIC_API_KEY` as a deployment env var; and a cloud deployment
-  survives the live walkthrough without a local backend to babysit. Rejected
-  alternative: anonymous local mode — works fine for dev, but is machine- and
-  directory-bound and adds a conversion step later.
-- **`npx convex dev` must be run from the tree that has `node_modules`**, otherwise
-  npx downloads a transient newer CLI (1.45.0) than the pinned local one (1.44.0).
-
----
-
-## 9. PROPOSED architecture — pending review, not implemented
-
-> Status: proposal. Nothing here is built. Recorded so the reasoning survives the
-> decision.
-
-### 9.1 Layers
-
-```
-convex/lib/money.ts       integer-cent primitives + the ONE cents->string formatter
-convex/lib/time.ts        the ONE timezone-aware bucketing/range resolver
-convex/lib/reporting.ts   PURE: computeStats / computeBreakdown / computeTimeseries
-                          / computeDonorRollup. No ctx, no db. Unit-testable
-                          against scripts/seed-replica.mjs without a deployment.
-convex/reporting.ts       Convex queries wrapping the pure fns. The ONLY place the
-                          succeeded-status filter is written. Exports the shared
-                          filter validator.
-convex/agent/tools.ts     Tool defs whose run() is `ctx.runQuery(api.reporting.X)`.
-convex/agent/chat.ts      Convex action: system prompt, tool loop, persistence.
-app/dashboard/**          useQuery(api.reporting.X) — renders, never computes.
+## 2. Running it
+
+```bash
+npm install
+npx convex dev                                # first run: creates your deployment
+npx convex run seed:run                       # deterministic seed data
+npx convex env set ANTHROPIC_API_KEY <key>    # NOT .env.local — see below
+npm run dev
 ```
 
-The agent's tools call **the same query references** the dashboard calls. Not
-parallel implementations kept in sync by discipline — the same function.
+### The API key goes on the Convex deployment
 
-### 9.2 The six tools
+**The assistant will not work with the key in `.env.local`.** It runs in a Convex
+*action*, which executes on Convex's servers, so `process.env` inside it reads the
+deployment's environment rather than your machine's. Check with
+`npx convex env list`. Without the key the assistant appends a message naming the
+variable and the exact command rather than throwing.
 
-Split by **result shape**, not by question. Result shape is the right axis because
-each shape maps 1:1 to a dashboard component, which is what makes the sharing real.
+This is a **deliberate deviation from README.md**, which says `.env.local`. That
+instruction presumes the Anthropic call happens in the Next.js process, which is a
+legitimate design we did not choose (§7). README.md is unmodified;
+`.env.example` names the contradiction. `.env.local` is still used, for the three
+`CONVEX_*` variables `npx convex dev` writes automatically.
 
-| tool | shape | dashboard twin | answers |
-|---|---|---|---|
-| `list_campaigns` | entity catalog | campaign switcher | name -> id resolution |
-| `get_fundraising_stats` | scalars | KPI tiles | Q1, Q4 |
-| `get_breakdown` | groups (`dimension: campaign\|frequency`) | breakdown table | Q2, Q5 |
-| `get_donation_timeseries` | zero-filled buckets | the chart | trend questions |
-| `list_top_donors` | donor rollups | donors table | Q3 |
-| `list_recent_donations` | gift rows | recent list | drill-down |
+**Expect ~73 type errors before that first `npx convex dev`.** The starter README
+says "roughly twenty" — that count predates the files this project added. Every
+one is a missing `convex/_generated` module or a downstream implicit `any`, and
+all of them clear once Convex has connected once.
 
-### 9.3 Schema decisions (the load-bearing ones)
+### Verifying
 
-1. **`status` is NOT a tool parameter.** It is baked into the aggregation. Instead
-   the stats payload *always* returns `raisedCents`, `pendingCents`, `failedCents`,
-   `refundedCents` as separate named fields. Makes it structurally impossible for
-   the model to compute "raised" over the wrong status set, while still answering
-   "how much failed?". Rejected: a `statuses[]` filter param — one bad call and the
-   agent contradicts the dashboard.
-2. **Time is a closed union**: either `{preset: enum}` (last_30_days, last_month,
-   this_quarter, ytd, all_time, ...) or `{startISO, endISO}`. Every response echoes
-   `resolvedRange {startISO, endISO, timezone}` so a misinterpretation is visible in
-   the transcript instead of silent.
-3. **Timezone is server-fixed (UTC), never a parameter.** If the agent could pick a
-   different zone than the dashboard, 46 of 251 rows would land in different days.
-4. **Every response carries `coverage: {datasetMinISO, datasetMaxISO, rowsMatched}`.**
-   This is the anti-hallucination mechanism: an empty result is *self-describing*
-   ("0 rows matched; data covers 2026-01-01..2026-06-29") rather than just empty.
-   Q1 ("last month" -> July -> zero rows) is answerable honestly with no special case.
-5. **Money returns both `cents` (int) and `formatted` (string).** The model is
-   instructed to quote `formatted` verbatim and never convert cents itself — the LLM
-   is a client, and clients don't do money math.
-6. **`strict: true` + `additionalProperties: false`** on every tool. The model
-   cannot invent a parameter that does not exist.
-7. **Limits are clamped server-side** and responses carry `truncated` + `totalMatched`.
-   A silent truncation is a correctness bug: "our donors are X, Y, Z" when there are 223.
-8. **The agent gets aggregates and display names — never donor emails.** Tool results
-   are persisted verbatim in `chatMessages`, which is a durable unauthenticated PII
-   store. None of the five required questions need an email. Cost: the agent cannot
-   answer "what's Amina's email"; the donors dashboard page can.
-9. **Anonymity is resolved per-donor on read**: show the name if *any* non-anonymous
-   gift exists, else "Anonymous donor". 2 emails in the seed are both.
+```bash
+npm test           # 88 tests, no deployment needed
+npm run verify     # live database vs the deterministic replica
+npm run typecheck
+npm run build
+```
 
-### 9.4 Rejected alternatives
-
-- **One `query_donations(groupBy, metrics, filters, sort)` tool.** This is the
-  "arbitrary input" design the brief rules out. Also makes model-vs-tool error
-  attribution much harder and prevents per-tool description tuning.
-- **One tool per required question.** Brittle; fails on the first question phrased
-  slightly differently ("which campaign did best in Q1?").
-- **Injecting the campaign catalog into the system prompt** instead of
-  `list_campaigns`. Cheaper (5 campaigns, ~200 tokens, zero round trips) but the
-  brief wants data reached through tools, and a visible resolution step in the tool
-  log is worth the round trip for debuggability.
-- **A dedicated `compare_campaigns` tool for Q5.** `get_breakdown` filtered to two
-  campaign ids already answers it. Adding it would slide toward per-question tools.
-
-### 9.5 Debuggability (brief: "model error or tool error?")
-
-Every tool result carries `_meta: {tool, resolvedFilter, rowsMatched, durationMs}`,
-persisted alongside `toolName`/`toolArgs` in `chatMessages` and rendered as an
-expandable card in the UI. A wrong number is then attributable at a glance: wrong
-`resolvedFilter` = model error; right filter + wrong number = tool error.
-
-### 9.6 Open, undecided
-
-- **Streaming.** Leaning persist-and-subscribe (action writes batched deltas via
-  internal mutation, client `useQuery` re-renders) over an `httpAction` SSE stream,
-  because it reuses persistence the brief already requires and survives refresh.
-  Costs DB writes per flush. Brief permits cutting streaming entirely.
-- **Convex runtime for the action.** Default V8 runtime should work (SDK targets web
-  standards); `"use node"` is the fallback. Verify early — it is cheap to test and
-  expensive to discover late.
-- **Pagination for `listByCampaign`.** Still unresolved; see §4.
+`npm run lint` remains unconfigured from the starter scaffold; correctness was
+verified with the full test suite, TypeScript typecheck, and production build.
 
 ---
 
-## 10. Decisions taken (locked)
+## 3. Architecture
 
-| # | Decision | Rationale / rejected alternative |
+```
+donations · campaigns              Convex tables
+        │
+        ├─ Scope             filterDonationsByScope — campaign + date, no status rule
+        └─ Status semantics  countsAsRaised · partitionByStatus — only succeeded is raised
+        │
+        ▼
+computeStats · computeBreakdown · computeTimeseries · computeDonorRollup
+        │                          pure functions — no ctx, no db, unit-tested
+        ▼
+convex/reporting.ts        stats · breakdown · timeseries · topDonors
+                           recentDonations · campaigns
+        │
+        ├── Dashboard        useQuery       renders, never computes
+        └── AI assistant     ctx.runQuery   six tools, one per result shape
+```
+
+**Scope and status are separate concerns.** Scope answers *which slice of the
+business* — campaign, date. Status answers *what counts as real money*. Keeping
+them apart is what stops "in scope" from quietly coming to mean "succeeded".
+
+**What the shared layer guarantees, precisely.** Both surfaces call the same
+deterministic queries, so there is no second implementation of the maths to
+drift. A Convex action cannot access `ctx.db`, and the tools expose only
+constrained reporting queries rather than raw donation rows. **What it does not
+guarantee:** the model can still choose the wrong tool, pass the wrong arguments,
+or misstate a correct result. That is why every tool call is shown in the UI.
+
+The pure functions take no `ctx` and no `db`, so they are tested against a
+deterministic replica of the seed without a deployment running.
+
+---
+
+## 4. Correctness rules
+
+Each of these produces a plausible number when broken — which is what makes them
+dangerous.
+
+| # | rule | what it prevents |
 |---|---|---|
-| D1 | **UTC for all reporting and date bucketing.** | Reproducible; seed epoch is UTC midnight so seed-day index == UTC calendar day exactly. **Production would use an org-configured timezone** — 46 of 251 rows change calendar day in America/Toronto, so this is a real product decision deferred, not a non-issue. |
-| D2 | **Historical `succeeded` donations count toward org totals regardless of current campaign status.** | Money that arrived is a historical fact; `status` governs whether a campaign accepts *new* gifts, not whether past gifts happened. Org total = **$66,705.00** including the ended campaign's $570. Excluding it would give $66,135.00. |
-| D3 | **No `convexToJsonSchema()`. Hand-maintain the tool schemas.** | Six small schemas. The generator is the better call at scale; at this size it is infrastructure that has to be explained in a walkthrough without earning its keep. Accepted cost: the tool schema and the Convex validator can drift, so they must be edited together. |
-| D4 | **No streaming until all required functionality, correctness, tests, and UI are complete.** | The brief permits it: "streaming if you can, not at the cost of correctness." Persist-and-subscribe (§9.6) remains the chosen approach if time allows. |
-| D5 | **Keep the shared reporting architecture and result-shape tool design** (§9). | Unchanged. |
-| D6 | **Every reporting query collects the whole `donations` table. No indexed narrowing.** | See §12 — this is a correctness decision, not a simplicity concession. |
-| D7 | **A donor is anonymous only if *every* gift was.** | A deliberate product assumption, not an inherent truth. See §13. |
+| 1 | Only `succeeded` is raised | $74,415.00 instead of $66,705.00 |
+| 2 | Status is never a caller-supplied filter | the agent computing "raised" over a different set than the dashboard |
+| 3 | `feeCoveredCents` is not raised | $67,928.38 — that figure is real, but it is *charged* |
+| 4 | A donor is a normalised email, not a row | 251 "donors" instead of 223 |
+| 5 | Empty time buckets are emitted | a smooth line across 47 days where nothing arrived |
+| 6 | Goal progress is lifetime, never range-scoped | 30.8% for a campaign at 171.8% |
+| 7 | Anonymity resolved per donor, on read | a name shown for someone who asked to be hidden |
+| 8 | Ordering is deterministic | dashboard and assistant naming different people at #7 |
 
-### D2 follow-up: draft-campaign inspection
+**On rule 2 specifically.** Campaign and date narrow *which rows* you are asking
+about. Status changes *what the word "raised" means*. If a caller could pass
+`statuses`, the assistant could report $69,810 as "total raised" while the
+dashboard said $66,705 — both correct given their inputs, and disagreeing about
+the most important number in the product. So pending, failed and refunded come
+back as **separate named figures in the response**, never as a filter in the
+request.
 
-Asked to flag anything ambiguous before locking D2. Findings:
-
-**The seed makes the decision unobservable.** `untitled-draft` has **0 donation rows**,
-so it contributes $0 under either reading. The number does not move — but the code
-still has to pick a rule, and the rule is not free.
-
-**The genuine ambiguity is that `status` is mutable while donations are historical.**
-Three cases:
-
-| case | in seed? | under D2 |
-|---|---|---|
-| `ended` campaign with past gifts | yes — $570 | counts |
-| `draft` campaign with no gifts | yes — $0 | contributes nothing |
-| `draft` campaign **with** past gifts | **no** | would count |
-
-The third case is reachable in the data model even though the seed does not contain
-it: nothing prevents an `active` campaign being flipped back to `draft`, and
-`donations:create` only refuses *new* gifts to non-active campaigns — it does not
-remove gifts already recorded.
-
-**That actually resolves the ambiguity rather than deepening it.** Because
-`donations:create` rejects any gift to a non-active campaign, a draft campaign can
-*only* acquire donations by having previously been active. In that case the money is
-real and belongs in the total. So D2 extends to `draft` cleanly, and the rule becomes
-a single sentence: **campaign status never filters historical money.**
-
-**Consequence to handle in the UI, not the aggregation:** the org total silently
-includes money from campaigns that are closed or unpublished. The campaign breakdown
-must therefore show each campaign's status, so $570 from a closed campaign is
-visible as such rather than looking like current activity.
-
-**Two empty-state cases confirmed from the same inspection:**
-- `untitled-draft` has **no `content` object at all** and no `goalCents`. The campaign
-  detail route must render a campaign with no headline, no description, no goal, and
-  zero donations without blanks or `NaN`.
-- `scholarship-endowment` is **active with no `goalCents`** ($7,275 raised). Percent-
-  to-goal must be `null`, not `0%` or `Infinity`.
+**On rule 8.** 32 donors have a lifetime of exactly $1,000.00, so ranks 3–10 of
+any top-10 are arbitrary without a fixed tiebreak. Ties break on email.
 
 ---
 
-## 11. NOTES.md rewrite before submission — TODO
+## 5. The assistant
 
-This file is currently a **working scratchpad**. Before submission it gets rewritten
-from scratch as a concise engineering document covering only:
+**Six tools, split by result shape** rather than by question: `list_campaigns`
+(catalog), `get_fundraising_stats` (scalars), `get_campaign_breakdown` (groups),
+`get_donation_timeseries` (buckets), `list_top_donors` (donor rollups),
+`list_recent_donations` (gift rows). Each maps to one dashboard component, and
+each `run` is a thin `ctx.runQuery` to the query that component uses.
 
-- what was actually built
-- major design decisions and why
-- key correctness guarantees
-- important tradeoffs
-- known limitations
-- verification results
+A single tool taking arbitrary input is not a design — it also makes model-error
+indistinguishable from tool-error, because every call looks identical. One tool
+per question breaks on the first question phrased slightly differently.
 
-Explicitly **not** carried over: the chronological reasoning, setup diary, prompt
-history, and the long tail of every edge case discovered along the way.
+**Model:** `claude-sonnet-5` — the workload is tool routing plus a short summary,
+and the correctness guarantees live in the server. Verified against all five
+required questions before adopting.
 
----
+**Manual tool loop, not the SDK runner**, so each call is persisted to
+`chatMessages` as it happens. The client subscribes to that table, so tool cards
+appear while the model is still working — live progress without streaming.
 
-## 12. Read strategy: why full-collect, and where the ceiling is
-
-Every query in `convex/reporting.ts` calls `.collect()` on the whole `donations`
-table. The `by_campaign` and `by_created` indexes exist and are deliberately
-unused.
-
-**This is a correctness decision.** `computeStats` and `computeTimeseries` take
-the *unscoped* rows so that `coverage` can report the dataset's true bounds even
-when the scope matches nothing. That is the mechanism that lets "how much did we
-raise last month?" answer **"$0.00, and the most recent gift is 2026-06-29"**
-instead of a bare zero the caller has to interpret — the single most important
-anti-hallucination property in the design.
-
-An indexed range read for July returns **zero rows**, so `coverage` would report
-`null` bounds and that guarantee would disappear silently. Restoring it needs a
-second query purely for dataset bounds, which means two sources of truth for
-"what is the dataset" — precisely the drift this architecture exists to prevent.
-The optimisation would have bought nothing measurable at 283 rows and cost the
-property the whole design is built around.
-
-### What this will not survive
-
-At 283 rows this is instant. It will not survive hundreds of thousands. And it
-does not degrade gracefully into slowness: Convex enforces a document-read limit,
-so a large table makes these queries **fail outright** rather than return a wrong
-number. That is the better failure mode, but it is still a hard ceiling.
-
-The org-wide "all time" case is the real wall. Campaign- and date-scoped reads
-can be narrowed with the existing indexes; an unscoped org total has nothing to
-narrow on and must read everything.
-
-### What production would do
-
-1. **Indexed reads** for the scoped cases (`by_campaign`, `by_created`), with
-   dataset bounds served by a separate cheap query — two `first()` reads against
-   `by_created` — so `coverage` survives.
-2. **Precomputed rollups** for the unscoped totals: a denormalised per-campaign
-   and per-period aggregate maintained on write, or Convex's aggregate component.
-3. **Reconciliation** for those rollups. A rollup that drifts from the donations
-   table is a second source of truth for money, so it needs a periodic job that
-   recomputes from source and alerts on mismatch. Without that, the rollup is a
-   liability rather than an optimisation.
-
-None of that is here, deliberately: it is unobservable at this scale, and it
-would have come out of the time the assistant needs.
-
----
-
-## 13. The anonymity rule is a product assumption
-
-`computeDonorRollup` treats a donor as anonymous **only if every one of their
-gifts was anonymous**. Two seeded donors are mixed — `wei.kim` (1 anonymous of
-13) and `amina.haddad` (2 of 11) — and both resolve to *named*.
-
-**This is a judgment call, not a fact the data implies.** The schema stores
-`anonymous` per gift and says nothing about what that means for a donor. The rule
-here reads it as *"this gift should not be attributed publicly"*, so a donor who
-has elsewhere attached their name has not asked to be hidden from staff.
-
-A reasonable organisation could choose differently:
-
-| alternative | argument for it | why not chosen |
-|---|---|---|
-| **Any anonymous gift hides the donor everywhere** | Strictest reading of donor intent; safest under a privacy complaint | Erases 2 of the top 2 donors from the donors table, making the org's most important relationships invisible to the staff who steward them |
-| **No donor-level answer; only per-gift display** | Avoids inventing a rule the data does not contain | The donors view and "top 10 donors" both *require* a per-donor answer; declining to have one means not building the feature |
-
-Whichever is right depends on the nonprofit's donor-privacy policy and possibly
-its jurisdiction. It should be an **org setting**, not a hard-coded constant.
-
-Note also that the rule is **scoped to per-donor rollups only**.
-`recentDonations` redacts per *gift* — a feed of individual gifts hides the name
-on any gift marked anonymous, regardless of what that donor did elsewhere. The
-two answers deliberately differ because they answer different questions.
-
----
-
-## 14. Dashboard UI
-
-Visual reference: the Polarity style guide. Tokens taken verbatim — light
-`#FEFEFE`/`#F2F2F2`/`#E6E6E6`/`#000614`/`#22445C`, dark `#0E0E0E`/`#171717`/
-`#262626`/`#FEFEFE`/`#7BA0BC`. `rounded-sm`, 1px borders, no shadows,
-sharp-cornered uppercase controls, `text-xs font-semibold uppercase
-tracking-wider` eyebrows, 2px focus ring at offset 2.
-
-**Where I deviated, and why.**
-
-| deviation | reason |
-|---|---|
-| "Cursor Gothic" → **Inter** | Not publicly distributed. Inter is the nearest grotesque that holds the reference's tight negative tracking and ships real tabular figures. |
-| Stat numbers `3rem`→`1.75rem` | The guide sizes stats for a marketing hero. Four KPI cards at 3rem is a billboard, not a dashboard, and the request explicitly ruled out oversized type. |
-| Added `--grid`, `--bar-muted`, `--surface-raised`, status tones | A dashboard needs states a marketing site never had. Derived from the palette, not invented alongside it. |
-
-**Bars, not a line — a correctness argument, not a style one.** 47 of the 180
-days have no succeeded gift. A line chart interpolates straight through them,
-drawing a steady climb across a fortnight where nothing arrived. Bars leave the
-gap visible. This is the same reason `computeTimeseries` zero-fills; the chart
-would throw that guarantee away by smoothing. Empty buckets render as a 1px
-baseline tick so a gap reads as *zero*, not as *missing*.
-
-**Default range is `all_time`.** The data ends 2026-06-29 and "today" is well
-past it, so a conventional 30-day default renders an empty dashboard that reads
-as a broken build. The header prints the requested window *and* the dataset
-coverage (`2026-07-24 → 2026-08-22 · data covers 2026-01-01 → 2026-06-29 · UTC`),
-so an empty result is self-explaining — the same principle as `coverage` in the
-tool payloads.
-
-**No layout shift.** Convex `useQuery` returns `undefined` on first render, so
-`{data && <X/>}` collapses a card to zero height and snaps it open. Every
-data-bearing component reserves its final height: `Figure` renders a skeleton of
-identical dimensions, KPI cards carry a fixed-height note row even when the note
-is empty, tables have `min-h-[16rem]`, and the chart's hover readout is a
-fixed-height row rather than a floating tooltip. Skeletons are not animated.
-
-**Money is never formatted client-side.** `recentDonations` returns
-`{cents, formatted}` from the server's `formatCents`. An early draft had a local
-`formatCents` in the component; it was removed. The LLM is not the only client
-that must not do money maths — the browser is a client too.
-
-**Goal bars clamp at 100%; the number does not.** Two campaigns are over goal
-(171.8%, 199.0%). A campaign with no goal renders "No goal", never `0%`.
-
-Known gaps: `/dashboard/campaigns/[id]`, `/dashboard/donors` and
-`/dashboard/assistant` are not built. Nav links only routes that exist — a link
-to a 404 is worse than a missing link.
-
----
-
-## 15. The assistant
-
-**Six tools, split by result shape** (`convex/agent/tools.ts`): `list_campaigns`,
-`get_fundraising_stats`, `get_campaign_breakdown`, `get_donation_timeseries`,
-`list_top_donors`, `list_recent_donations`. Every `run` is a thin
-`ctx.runQuery` to the *same* query the dashboard calls.
-
-Convex actions cannot touch `ctx.db`, so this is enforced by the platform rather
-than by discipline: the agent has no way to reach a donation row. It chooses
-which question to ask; the server computes every number.
-
-**Manual tool loop, not the SDK tool runner.** Each tool call and result is
-persisted to `chatMessages` as it happens — the brief requires that, and it also
-gives the UI live progress without implementing streaming, since the client
-subscribes to the messages query and tool cards appear while the model is still
-working. The runner would have made per-call persistence awkward for no gain.
-
-**`thinking` is omitted** rather than set to `adaptive`: Opus 5 runs adaptive by
-default, and SDK 0.65's types predate the `'adaptive'` literal.
-
-### Anti-hallucination, structurally rather than by prompting
+### Anti-hallucination is structural, not prompted
 
 - The system prompt contains **no figures**, so there is nothing to parrot.
-- Tool results are self-describing: `coverage` states the dataset bounds, so an
-  empty July returns "0 rows, data covers 2026-01-01 → 2026-06-29" instead of a
-  bare zero. The honest answer is the easy answer.
-- Money crosses as `{cents, formatted}`. The model is told to quote `formatted`
-  verbatim and may compare `cents` but never do arithmetic on it.
-- `additionalProperties: false` everywhere, so the model cannot invent an
-  argument — most importantly a `statuses` filter, which must never exist. A test
-  asserts the string "statuses" appears nowhere in the schemas.
-- Tool failures return `is_error` to the model rather than throwing, so it can
-  correct its arguments or say it cannot answer.
+- Tool results are **self-describing**: `coverage` carries the dataset's real
+  bounds, so an empty July returns "0 rows, data covers 2026-01-01 → 2026-06-29"
+  rather than a bare zero.
+- Money crosses as `{cents, formatted}`; the model quotes `formatted` verbatim and
+  may compare `cents` but never do arithmetic on it.
+- `additionalProperties: false` on every schema — the model cannot invent an
+  argument, most importantly a `statuses` filter.
+- Tool failures return `is_error` rather than throwing, so the model can correct
+  its arguments or say it cannot answer.
 
-### Schema drift — the risk D3 accepted, now mitigated
+### Privacy and debuggability
 
-Hand-written schemas can drift from the Convex validators they mirror. Schemas
-live in `convex/agent/schemas.ts` with no Convex imports so they are directly
-testable, and `tests/agent-schemas.test.ts` pins the range presets against
-`RANGE_PRESETS` and the sort enums against the reporting constants. Drift now
-fails a test instead of surfacing as an agent that quietly cannot express a range.
+`list_top_donors` projects `email` away before the result reaches the model — tool
+results persist in a table with no auth in front of it, and no question the
+assistant answers needs contact data. `list_recent_donations` returns no email
+field at all, and `donorName` is `null` for anonymous gifts.
 
-### Privacy
-
-`list_top_donors` projects `email` away before the result is returned. Tool
-results are persisted verbatim in `chatMessages`, which is a durable store with
-no auth in front of it, and no question the assistant answers needs an email.
-The donors dashboard page still shows emails — it reads the query directly and
-renders them ephemerally.
-
-### Debuggability
-
-Every tool result carries `_meta {tool, durationMs}`, and the UI renders each
-call as an expandable card showing arguments and full result. That makes a wrong
-number attributable at a glance: wrong arguments is a model error, right
-arguments with wrong figures is a tool error, and right figures with wrong prose
-is a presentation error — three different fixes in three different files.
-
-### Setup required
-
-### Deviation from the README: the key is NOT in `.env.local`
-
-The README says to put the API key in `.env.local`. **This project cannot use
-that**, and the reason is where the code runs rather than a preference.
-
-`.env.local` is read by Next.js, on the developer's machine. The agent runs in a
-**Convex action**, which executes on Convex's servers, so `process.env` inside it
-resolves against the Convex deployment's environment — a key in `.env.local` is
-invisible to it.
-
-The README's instruction assumes the Anthropic call happens in the Next.js
-process (a route handler or server action). That is a legitimate architecture and
-would keep the key in `.env.local` as written. It was not chosen because
-`appendMessage` is an `internalMutation`, reachable only from inside Convex;
-driving the agent from a Next route would require exposing the chat mutations
-publicly, so anything on the internet could write into `chatThreads` /
-`chatMessages`. With no auth in this project, that door is better left shut.
-
-Note the "one implementation" guarantee survives either way — a Next route using
-`ConvexHttpClient` would call the same `api.reporting.*` functions. The deciding
-factor was the internal-mutation boundary and the extra hop, not correctness.
-
-`.env.local` is still used, for `NEXT_PUBLIC_CONVEX_URL`, which `npx convex dev`
-writes automatically.
-
-`.env.example` has been edited to say this too — worth flagging that the edit is
-ours, not the starter's. The starter listed `ANTHROPIC_API_KEY=` directly under
-"Copy to .env.local", so the original repo did intend `.env.local`. README.md is
-unmodified and still says so.
-
-**To run the assistant**, after `npx convex dev`:
-
-```
-npx convex env set ANTHROPIC_API_KEY <key>
-```
-
-### Credentials
-
-Credentials live on the **Convex deployment**.
-
-```
-npx convex env set ANTHROPIC_API_KEY <key>
-```
-
-Without any credential the agent degrades gracefully: it appends a message naming
-the variables and the commands to fix them rather than throwing. That path is
-verified; the model path is not (see §16).
-
-**`ANTHROPIC_API_KEY` is the intended and supported configuration**, and the only
-one this project treats as shipped. It is what a reviewer will set.
-
-**`ANTHROPIC_AUTH_TOKEN` is a local-development convenience.**
-`claude setup-token` issues a long-lived OAuth credential tied to a Claude
-subscription; the Messages API accepts it as `Authorization: Bearer` together
-with the `anthropic-beta: oauth-2025-04-20` header, and usage draws on the
-subscription rather than Console credits. That makes iterating on the agent free.
-
-It is checked **before** the API key, so setting it is an explicit override and a
-deployment with only `ANTHROPIC_API_KEY` behaves exactly as the supported path.
-The active mode is logged (`[assistant] auth mode: …`) so it is never a mystery
-which credential answered.
-
-Two honest caveats, recorded rather than buried: this is **not an officially
-supported way to authenticate a third-party application** — the beta header and
-OAuth scopes carry no compatibility promise and can stop working without notice —
-and it is outside the intended use of a subscription credential. It is used here
-only for local iteration against the author's own subscription, never as the
-shipped configuration.
+Every tool result carries `_meta {tool, durationMs}`, and the UI renders each call
+as an expandable card showing arguments and full result. A wrong number is then
+attributable: wrong arguments is a model error, right arguments with wrong figures
+is a query error, right figures with wrong prose is a presentation error.
 
 ---
 
-## 16. Not yet verified
+## 6. Verified figures
 
-- **The assistant's actual answers.** No `ANTHROPIC_API_KEY` has been set on the
-  deployment, so the model has never run. Everything around it is verified —
-  thread creation, message persistence, the action dispatching, tool-call
-  rendering, and the missing-key path — but no real answer has been produced or
-  checked against BASELINE.md §"Answers to the five required agent questions".
-- **Mobile/responsive layout.** Built with responsive classes, only checked at
-  1280px.
-- **Accessibility** beyond focus rings, ARIA labels on controls, and semantic
-  tables. No screen-reader pass.
-- **Concurrency.** Two rapid submissions in one thread are not guarded
-  server-side; the UI disables the input while busy, which is a client-side
-  guard only.
+The seed is a deterministic PRNG with a fixed epoch and no I/O, so the dataset can
+be rebuilt **outside the database** and compared field by field.
+`scripts/seed-replica.mjs` reproduces it; `scripts/verify-baseline.mjs` diffs the
+live deployment against it. All 283 rows match on every field. Full tables live in
+`BASELINE.md`; the headlines:
+
+| metric | value |
+|---|---:|
+| Total raised | **$66,705.00** |
+| Donations | **251** of 283 rows |
+| Unique donors | **223** |
+| Average gift | **$265.76** (median $100.00) |
+| Repeat donors | **3** |
+| Fees covered | $1,223.38 |
+| Total charged | $67,928.38 |
+
+Excluded from raised: 8 pending, 16 failed, 8 refunded — 32 rows, $7,710.00.
+
+### The five required questions
+
+| question | verified answer |
+|---|---|
+| How much did we raise last month? | **$0.00** — data ends 2026-06-29 |
+| Which campaign is doing best? | Ambiguous: Legal Defense $42,940.00 by raised; Winter Meal 199% by goal. Must state which. |
+| Who are our top 10 donors? | Amina Haddad $3,435.00, Wei Kim $3,110.00, then 8 of the 32 tied at $1,000.00 |
+| How many gave more than once? | **3** |
+| Meal drive vs legal fund in March? | No — $7,710.00 vs $3,785.00 |
+
+All five confirmed live against the deployment, with tool calls and arguments
+inspected.
+
+---
+
+## 7. Design decisions
+
+Each of these could reasonably have gone the other way.
+
+### Full-collect reads, indexes unused
+
+**Chose.** Every query `.collect()`s the whole donations table.
+
+**Why here.** Simplest correct thing at 283 rows, and `computeStats` takes the
+*unscoped* rows so `coverage` can report the dataset's bounds even when the scope
+matches nothing.
+
+**The honest tradeoff.** **Indexed scoped reads would also be correct.** A
+`by_created` read for July returns zero rows, and "there were no donations in
+July" is already an honest answer. What an indexed read loses is *global dataset
+coverage* — it cannot see rows outside its range — recoverable with two `first()`
+reads for the bounds, at the cost of a second query that also knows what "the
+dataset" is. Full collect is a take-home choice, not the only correct approach.
+
+**Production.** Indexed scoped reads, precomputed rollups for unscoped totals, and
+a reconciliation job — a rollup that drifts from source is a second source of
+truth for money. Revisit at any real dataset size: this does not degrade into
+slowness, Convex's document-read limit makes it fail outright.
+
+### UTC for all date bucketing
+
+**Chose.** UTC, fixed, not configurable.
+
+**Why here.** Reproducibility. The seed epoch is UTC midnight, so seed-day equals
+calendar-day exactly.
+
+**Tradeoff.** **This is a reproducibility choice, not production timezone
+handling.** 46 of 251 gifts land on a different calendar day in America/Toronto.
+The high-stakes case is year-end: a gift at 11pm on 31 December Eastern is
+1 January UTC, which moves it into the next tax year.
+
+**Production.** Timezone on the org record, threaded through range resolution and
+bucketing.
+### The assistant runs in a Convex action
+
+**Chose.** Agent loop in a Convex action; key as a deployment env var.
+
+**Why here.** Every other backend function is Convex; actions tolerate a
+multi-turn loop better than a typical serverless timeout; `ctx.runQuery` is
+in-process; `appendMessage` stays internal.
+
+**Honest accounting.** The one-implementation guarantee does **not** come from
+this — a Next route using `ConvexHttpClient` would call the identical functions.
+It comes from the tool surface. The real cost of this choice is reviewer friction:
+someone following README puts the key in `.env.local` and gets "not configured".
+
+**Rejected.** Next route handler with the key in `.env.local`, matching README
+literally. Reversible in about an hour.
+
+### Donor identity is a normalised email
+
+**Chose.** Lowercased, trimmed email as the identity.
+
+**This is given, not designed.** The provided schema has no donors table and keys
+on `donorEmail`. It is not a general recommendation to identify people by email.
+
+**Tradeoff.** Email is not stable identity — two addresses is two donors,
+plus-addressing and Gmail dots are the same mailbox, a shared household inbox is
+one "donor" who is two people. Production wants a donors table with a stable id
+and merge/dedupe tooling.
+
+### Anonymity resolved per donor
+
+**Chose.** A donor is displayed anonymously only if **every** succeeded gift is
+anonymous.
+
+**Three levels, kept distinct.** `anonymous` is stored **per gift** in the schema.
+Donor-level display anonymity is **derived on read**, never stored. The rule above
+is a **product assumption**, not a fact the data implies.
+
+**Tradeoff, stated plainly.** It arguably leaks intent: two seeded donors gave
+both ways, and their donor row shows a lifetime total that *includes* the
+anonymous gifts under their name. The alternative — any anonymous gift hides the
+donor everywhere — erases both top donors from the donors view, hiding the org's
+most important relationships from the staff who steward them.
+
+**Production.** An org setting, and separating "hidden from the public" from
+"hidden from staff" — most CRMs let staff see everything.
+
+### Three smaller calls
+
+**Hand-written tool schemas.** Six JSON Schemas maintained by hand, with tests
+pinning their enums to the reporting constants. A generator is the better answer
+at scale; at six schemas it is infrastructure that needs explaining. The gap: the
+tests pin enums, not the argument list, so adding a parameter to a query fails
+nothing.
+
+**Tool results persisted but never replayed.** Every call is saved for the audit
+trail and the live UI, but saved results are excluded from the history sent back
+to the model — a saved figure goes stale the moment a donation arrives. Cost: the
+model has no memory of what it looked up, so a follow-up re-fetches from scratch.
+Production would keep recent results with a freshness stamp.
+
+**Campaign status never filters historical money.** Succeeded gifts count whether
+a campaign is active, ended, or draft. Money that arrived is a historical fact;
+status governs whether a campaign accepts *new* gifts. `donations:create` refuses
+non-active campaigns, so a draft can only hold donations by having previously been
+active — in which case the money is real. The breakdown carries campaign status so
+the UI can show that $570 came from a closed campaign.
+
+---
+
+## 8. Known limitations
+
+- **Full collect will not survive a real dataset.** Fails outright rather than
+  degrading. See §7.
+- **UTC is not production timezone handling.** See §7.
+- **No auth.** Not required, but it means the dashboard already exposes donor
+  emails to anyone who can load the page — so the agent-side email projection
+  hardens a side door while the front door is open.
+- **`npm run lint` is unconfigured** starter scaffold state.
+- **Narrow viewports clip the KPI figure.** At ~490px `$66,705.00` renders against
+  the card edge. No page-level overflow; desktop and tablet are clean.
+- **No streaming.** Tool cards appear live via subscription, but the final answer
+  arrives at once.
+- **Tool schemas are hand-maintained.** Enum drift is tested; argument drift is not.
+- **Convex ids are seed-dependent.** `seed:run` mints new ids, so campaign URLs
+  from before a re-seed 404 into the "Campaign not found" state.
+
+---
+
+## 9. With another week
+
+1. **Precomputed rollups with reconciliation**, so the reporting layer survives a
+   real dataset — plus indexed scoped reads with dataset bounds sourced separately.
+2. **Org-configured timezone** threaded through range resolution and bucketing,
+   with tests for the year-end boundary case.
+3. **A comparison tool for the assistant.** Today "was March better than April?"
+   forces the model to make two calls and compare them itself — arithmetic-adjacent,
+   in the one place the model should not be operating.
+
+---
+
+## 10. What surprised me
+
+**The seed's own comment is wrong.** It says "~420 gifts"; it produces 283.
+`Math.floor(rand() * 4)` averages 1.5/day over 180 days. Taking the comment as an
+expected row count would send you hunting a bug that does not exist.
+
+**32 donors tie at exactly $1,000.00.** A top-10 list is mostly a tie, which makes
+deterministic ordering a correctness requirement rather than a nicety.
+
+**Both models tested misread the same field.** When goal progress was called
+`goalProgressPct` and sat inside a range-scoped result, Opus described it as
+"cumulative to date" and Sonnet as "that month" — both wrong, in opposite
+directions. Renaming it `lifetimeGoalProgressPct` fixed the prose without touching
+the number. A self-describing field name beat a prompt instruction.
