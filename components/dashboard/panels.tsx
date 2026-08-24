@@ -106,7 +106,7 @@ export function KpiRow({ scope }: { scope: Scope }) {
         label="Donations"
         value={stats ? String(stats.donationCount) : null}
         loading={loading}
-        note={stats ? `${stats.rowsInScope} records, succeeded only` : undefined}
+        note={stats ? `succeeded, of ${stats.rowsInScope} records in range` : undefined}
       />
       <Kpi
         label="Unique donors"

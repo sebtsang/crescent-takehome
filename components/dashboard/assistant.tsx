@@ -4,6 +4,7 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { InlineMarkdown } from '@/components/ui/inline-markdown';
 import { Card, EmptyState, Skeleton } from '@/components/ui/primitives';
 
 const SUGGESTIONS = [
@@ -196,7 +197,7 @@ function Message({ message }: { message: ChatMessage }) {
 
   return (
     <div className="max-w-[95%] whitespace-pre-wrap text-sm leading-relaxed text-txt">
-      {message.content}
+      <InlineMarkdown text={message.content} />
     </div>
   );
 }
