@@ -7,6 +7,10 @@ donors give money, and the org needs to understand what came in.
 file covers everything common to it: setup, the data model, and how we read
 what you submit.
 
+> **Submission:** see [`NOTES.md`](NOTES.md) for engineering decisions,
+> correctness rules and known limitations, and `architecture.html` for a visual
+> overview of the data model and reporting architecture.
+
 ---
 
 ## Setup
@@ -25,8 +29,9 @@ functions on save and generates the types in `convex/_generated`.
 
 > **Expect type errors before that first `npx convex dev`.** `convex/_generated`
 > does not exist in a fresh clone, so your editor and `npm run typecheck` will
-> report roughly twenty "Cannot find module './_generated/server'" errors. They
-> all disappear once Convex has connected once. Nothing is broken.
+> report "Cannot find module './_generated/server'" errors, plus the implicit
+> `any` errors that follow from them. They all disappear once Convex has
+> connected once. Nothing is broken.
 
 You will create your own free Convex account, so the deployment and its data
 are entirely yours.
@@ -37,9 +42,17 @@ Re-seed whenever you want a clean slate:
 npx convex run seed:run
 ```
 
-If your brief involves an API key, it was sent to you separately. Put it in
-`.env.local`, which is gitignored. **This repository is public — a key in a
-commit is visible to everyone immediately.**
+If your brief involves an API key, it was sent to you separately. Set it on your
+Convex deployment:
+
+```bash
+npx convex env set ANTHROPIC_API_KEY <key>
+```
+
+The assistant runs in a Convex action, which executes on Convex's servers, so it
+reads the deployment's environment rather than `.env.local`. Check it with
+`npx convex env list`. **This repository is public — a key in a commit is visible
+to everyone immediately.**
 
 ---
 
