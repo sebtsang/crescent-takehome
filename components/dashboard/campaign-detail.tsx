@@ -24,19 +24,53 @@ import { Card, EmptyState, Skeleton, StatusPill } from '@/components/ui/primitiv
 export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const [preset, setPreset] = useState<Preset>('all_time');
   const [grain, setGrain] = useState<Grain>('month');
-  const scope: Scope = { range: { preset }, campaignIds: [campaignId] };
 
+  /**
+   * Resolve the id against the catalog BEFORE any campaign-scoped query runs.
+   *
+   * `campaignId` arrives straight from the URL, and the scoped queries type it
+   * as `v.id('campaigns')`. Convex rejects anything that is not a real document
+   * id at the argument validator, and `useQuery` surfaces that as a throw during
+   * render -- which crashed the whole page and made the "not found" state below
+   * unreachable. Convex ids carry a checksum, so this is not only a typo case:
+   * a deleted campaign, a stale bookmark, or a link from before a re-seed all
+   * fail the same way.
+   *
+   * `campaigns` takes no arguments and therefore cannot throw. Everything
+   * scoped to a campaign passes 'skip' until the id is known to be real.
+   */
   const campaigns = useQuery(api.reporting.campaigns, {});
-  const breakdown = useQuery(api.reporting.breakdown, {
-    ...scope,
-    dimension: 'campaign',
-  } as never);
-
   const campaign = campaigns?.find((c) => c._id === campaignId);
+  const validId = campaign?._id;
+
+  const breakdown = useQuery(
+    api.reporting.breakdown,
+    validId
+      ? ({ range: { preset }, campaignIds: [validId], dimension: 'campaign' } as never)
+      : 'skip'
+  );
+
   const group = breakdown?.groups[0];
 
+  // Catalog still loading. Reserve the page's shape rather than mounting the
+  // panels, which would issue scoped queries with an unverified id.
+  if (campaigns === undefined) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-7 w-64" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-[5.75rem] w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-[15rem] w-full" />
+      </div>
+    );
+  }
+
   // An unknown id is a real case (stale link, deleted campaign), not a crash.
-  if (campaigns !== undefined && !campaign) {
+  if (!validId) {
     return (
       <div className="card min-h-[16rem]">
         <EmptyState
@@ -46,6 +80,8 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       </div>
     );
   }
+
+  const scope: Scope = { range: { preset }, campaignIds: [validId] };
 
   return (
     <div className="flex flex-col gap-3">
