@@ -46,7 +46,7 @@ export function Donors() {
     <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[1.375rem] font-medium leading-[1.15] tracking-tighter">Donors</h1>
+          <h1 className="display text-[1.6rem] leading-[1.1]">Donors</h1>
           <div className="mt-1 flex h-3 items-center text-xs leading-none text-txt3">
             {loading ? (
               <Skeleton className="h-3 w-48" />
@@ -75,7 +75,7 @@ export function Donors() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or email"
             aria-label="Search donors"
-            className="min-w-0 flex-1 border border-line bg-[var(--bg)] px-2 py-1 text-sm text-txt placeholder:text-txt3"
+            className="min-w-0 flex-1 rounded-[0.375rem] border border-line bg-[var(--bg)] px-2.5 py-1.5 text-sm text-txt placeholder:text-txt3"
           />
           <label className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-txt3">
             <input

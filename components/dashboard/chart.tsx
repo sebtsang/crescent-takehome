@@ -108,8 +108,8 @@ export function BarChart({
                 className="group relative h-full flex-1 cursor-pointer"
               >
                 <span
-                  className={`absolute inset-x-0 bottom-0 block ${
-                    hovered === i ? 'bg-[var(--txt)]' : 'bg-bar'
+                  className={`absolute inset-x-0 bottom-0 block rounded-t-[2px] transition-colors ${
+                    hovered === i ? 'bg-[var(--accent-hover)]' : 'bg-bar'
                   }`}
                   // min 1px keeps an empty bucket visible as a baseline tick
                   // rather than vanishing, so gaps read as "zero", not "missing".

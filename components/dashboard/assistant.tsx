@@ -57,7 +57,7 @@ export function Assistant() {
     <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[1.375rem] font-medium leading-[1.15] tracking-tighter">
+          <h1 className="display text-[1.6rem] leading-[1.1]">
             Assistant
           </h1>
           <p className="mt-1 text-xs leading-none text-txt3">
@@ -70,7 +70,7 @@ export function Assistant() {
             setThreadId(null);
             setInput('');
           }}
-          className="min-h-7 cursor-pointer border border-line px-2 py-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[0.08em] text-txt3 hover:text-txt"
+          className="min-h-7 cursor-pointer rounded-[0.375rem] border border-line px-2.5 py-1 text-[0.625rem] font-medium uppercase leading-none tracking-[0.07em] text-txt3 transition-colors hover:border-line-strong hover:text-txt"
         >
           New conversation
         </button>
@@ -113,12 +113,12 @@ export function Assistant() {
               placeholder="Ask a question about donations"
               aria-label="Ask a question"
               disabled={busy}
-              className="min-w-0 flex-1 border border-line bg-[var(--bg)] px-2 py-1.5 text-sm text-txt placeholder:text-txt3 disabled:opacity-60"
+              className="min-w-0 flex-1 rounded-[0.375rem] border border-line bg-[var(--bg)] px-2.5 py-1.5 text-sm text-txt placeholder:text-txt3 disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="min-h-7 cursor-pointer border border-[var(--txt)] bg-[var(--txt)] px-3 py-1.5 text-[0.625rem] font-semibold uppercase leading-none tracking-[0.08em] text-[var(--bg)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-7 cursor-pointer rounded-[0.375rem] bg-accent px-3.5 py-1.5 text-[0.625rem] font-medium uppercase leading-none tracking-[0.07em] text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               Ask
             </button>
@@ -189,7 +189,7 @@ function Message({ message }: { message: ChatMessage }) {
 
   if (message.role === 'user') {
     return (
-      <div className="self-end max-w-[85%] border border-line bg-[var(--bg)] px-3 py-2 text-sm text-txt">
+      <div className="max-w-[85%] self-end rounded-[0.5rem] bg-accent-soft px-3 py-2 text-sm text-txt">
         {message.content}
       </div>
     );
@@ -215,7 +215,7 @@ function ToolCall({ message }: { message: ChatMessage }) {
   const failed = result && typeof result === 'object' && 'error' in (result as object);
 
   return (
-    <div className="border border-line bg-[var(--bg)]">
+    <div className="rounded-[0.375rem] border border-line bg-[var(--bg)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

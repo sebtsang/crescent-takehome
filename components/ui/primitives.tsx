@@ -26,7 +26,7 @@ export function Card({
   return (
     <section className={`card flex flex-col ${className}`}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
+        <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-2.5">
           <div className="flex min-w-0 items-baseline gap-3">
             {title && <h2 className="eyebrow truncate">{title}</h2>}
             {meta && <span className="truncate text-[0.6875rem] text-txt3">{meta}</span>}
@@ -47,7 +47,7 @@ export function Skeleton({
   className?: string;
   style?: React.CSSProperties;
 }) {
-  return <div className={`rounded-sm bg-line/70 ${className}`} style={style} aria-hidden />;
+  return <div className={`rounded bg-surface ${className}`} style={style} aria-hidden />;
 }
 
 export function SegmentedControl<T extends string>({
@@ -65,7 +65,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="flex divide-x divide-line border border-line"
+      className="flex gap-0.5 rounded-[0.375rem] border border-line bg-surface p-0.5"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -76,9 +76,9 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(o.value)}
             aria-pressed={active}
             className={[
-              'min-h-7 cursor-pointer px-2 py-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[0.08em] transition-colors',
+              'min-h-7 cursor-pointer rounded-[0.25rem] px-2.5 py-1 text-[0.625rem] font-medium uppercase leading-none tracking-[0.07em] transition-colors',
               active
-                ? 'bg-[var(--txt)] text-[var(--bg)]'
+                ? 'bg-[var(--surface-raised)] text-accent shadow-soft'
                 : 'text-txt3 hover:text-txt',
             ].join(' ')}
           >
@@ -103,14 +103,17 @@ export function Figure({
   loading: boolean;
   size?: 'lg' | 'sm';
 }) {
+  // Instrument Serif on the KPI figure only. It reads as Crescent without
+  // turning the whole surface into a marketing page — everything else, and all
+  // tabular columns, stay mono or sans.
   const cls =
     size === 'lg'
-      ? 'text-[1.75rem] leading-[1.15] tracking-tighter'
-      : 'text-base leading-[1.15] tracking-tightest';
+      ? 'display text-[1.875rem] leading-[1.075]'
+      : 'num text-base font-medium leading-[1.15] tracking-tighter';
   if (loading) {
     return <Skeleton className={size === 'lg' ? 'h-[2.0125rem] w-32' : 'h-[1.15rem] w-20'} />;
   }
-  return <div className={`num font-medium ${cls}`}>{value ?? '—'}</div>;
+  return <div className={cls}>{value ?? '—'}</div>;
 }
 
 /** Empty state. Explains WHY it is empty -- a bare "no data" reads as a bug. */
@@ -126,13 +129,13 @@ export function EmptyState({ headline, detail }: { headline: string; detail?: st
 export function StatusPill({ status }: { status: 'draft' | 'active' | 'ended' }) {
   const tone =
     status === 'active'
-      ? 'text-[var(--accent)] border-[var(--accent)]'
+      ? 'text-accent bg-accent-soft'
       : status === 'ended'
-        ? 'text-txt3 border-line'
-        : 'text-warn border-warn';
+        ? 'text-txt3 bg-surface'
+        : 'text-warn bg-surface';
   return (
     <span
-      className={`shrink-0 border px-1 py-px text-[0.5625rem] font-semibold uppercase leading-tight tracking-[0.08em] ${tone}`}
+      className={`shrink-0 rounded-full px-1.5 py-px text-[0.5625rem] font-medium uppercase leading-tight tracking-[0.07em] ${tone}`}
     >
       {status}
     </span>

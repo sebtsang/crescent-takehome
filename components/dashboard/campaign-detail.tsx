@@ -88,7 +88,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       <div>
         <Link
           href="/dashboard"
-          className="text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-txt3 hover:text-txt"
+          className="text-[0.6875rem] font-medium uppercase tracking-[0.07em] text-txt3 transition-colors hover:text-accent"
         >
           ← Overview
         </Link>
@@ -129,12 +129,12 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               </div>
             ) : (
               <>
-                <div className="num text-[1.75rem] font-medium leading-none tracking-tighter">
+                <div className="display text-[1.875rem] leading-none">
                   {group?.lifetimeGoalProgressPct ?? 0}%
                 </div>
-                <div className="h-1.5 w-full bg-bar-muted">
+                <div className="h-1.5 w-full rounded-full bg-bar-muted">
                   <div
-                    className="h-full bg-bar"
+                    className="h-full rounded-full bg-bar"
                     style={{ width: `${Math.min(100, group?.lifetimeGoalProgressPct ?? 0)}%` }}
                   />
                 </div>

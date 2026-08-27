@@ -254,6 +254,22 @@ enums, not the argument list, so adding a parameter to a query fails nothing.
 audit trail and the live UI, but a saved figure goes stale the moment a donation
 lands. Cost: a follow-up question re-fetches everything.
 
+**The visual language is Crescent's.** Tokens are lifted from getcrescent.com's
+own stylesheet — the warm off-white base `#f8f7f4`, beige surface `#f2f0ed`, and
+the purple ramp `#32175a / #8345dd / #ac7cf2 / #efebfc` — with `.5rem` radii and
+Crescent's warm-tinted shadows rather than black ones. Type is Instrument Serif
+for page titles and KPI figures, JetBrains Mono for tabular columns, and Inter as
+a stand-in for TWK Lausanne, which is commercial. Dark mode is derived from the
+deep purple and ebony tokens.
+
+Two judgement calls. Large chart fills use a softer `#9c6ce8` rather than the
+saturated brand purple, which reads as branding when it covers that much area —
+the vivid accent is kept for hover, buttons and active state so it stays
+emphatic. And the serif is deliberately limited to titles and the four KPI
+figures; everything else stays sans or mono, because this is read at arm's length
+across hundreds of rows and should feel operational rather than like the
+marketing page.
+
 **Campaign status never filters historical money.** Succeeded gifts count whether a
 campaign is active, ended or draft — money that arrived is a fact, and status only
 governs whether new gifts are accepted. `donations:create` refuses non-active
@@ -272,8 +288,6 @@ $570 came from a closed campaign.
   to anyone who can load the page — so stripping them from the agent's tool results
   hardens a side door while the front door is open.
 - **`npm run lint` doesn't run.**
-- **Narrow viewports clip the KPI figure.** Around 490px `$66,705.00` runs against
-  the card edge. Nothing overflows the page; desktop and tablet are fine.
 - **No streaming.** Tool cards appear live, the final answer lands at once.
 - **Argument drift in tool schemas isn't caught.** Enum drift is.
 - **Convex ids change on re-seed**, so older campaign URLs land on "Campaign not

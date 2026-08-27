@@ -63,7 +63,7 @@ function CampaignBreakdownCard({ scope }: { scope: Scope }) {
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/dashboard/campaigns/${g.key}`}
-                        className="truncate text-txt underline-offset-2 hover:underline"
+                        className="truncate text-txt underline-offset-2 hover:text-accent hover:underline"
                       >
                         {g.label}
                       </Link>
@@ -100,10 +100,10 @@ export function GoalCell({ pct, goal }: { pct: number | null; goal?: string }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <span className="num text-sm font-medium">{pct}%</span>
-      <div className="h-1 w-16 bg-bar-muted">
+      <div className="h-1 w-16 rounded-full bg-bar-muted">
         {/* The bar clamps at 100; the number above does not. Two campaigns
             are over goal (171.8%, 199.0%) and that is worth seeing. */}
-        <div className="h-full bg-bar" style={{ width: `${Math.min(100, pct)}%` }} />
+        <div className="h-full rounded-full bg-bar" style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
       {goal && <span className="num text-[0.625rem] text-txt3">of {goal}</span>}
     </div>

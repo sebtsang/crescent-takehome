@@ -56,7 +56,7 @@ export function RangeHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="truncate text-[1.375rem] font-medium leading-[1.15] tracking-tighter">
+        <h1 className="display truncate text-[1.6rem] leading-[1.1]">
           {title}
         </h1>
         {/* Prints the requested window AND the dataset coverage, so an empty
