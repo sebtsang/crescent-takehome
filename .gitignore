@@ -2,7 +2,6 @@ node_modules/
 .next/
 .env.local
 .env*.local
-convex/_generated/
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
