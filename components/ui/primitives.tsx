@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 
 /**
- * Shared primitives, styled from the Polarity guide: rounded-sm, 1px borders,
- * no shadows, uppercase eyebrow labels, sharp-cornered controls.
+ * Shared primitives, styled after Crescent's product UI: near-white surfaces,
+ * hairline borders, no shadows, small sentence-case labels, and purple reserved
+ * for primary actions and active state.
  *
  * Every data-bearing primitive has a matching skeleton of the SAME height. The
  * brief grades "does the UI stay still" -- Convex's useQuery returns undefined
@@ -26,9 +27,9 @@ export function Card({
   return (
     <section className={`card flex flex-col ${className}`}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-2.5">
+        <header className="flex items-center justify-between gap-4 px-5 pb-3 pt-4">
           <div className="flex min-w-0 items-baseline gap-3">
-            {title && <h2 className="eyebrow truncate">{title}</h2>}
+            {title && <h2 className="section-title truncate">{title}</h2>}
             {meta && <span className="truncate text-[0.6875rem] text-txt3">{meta}</span>}
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
@@ -65,7 +66,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="flex gap-0.5 rounded-[0.375rem] border border-line bg-surface p-0.5"
+      className="flex gap-0.5 rounded-[0.375rem] bg-surface p-0.5"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -76,9 +77,9 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(o.value)}
             aria-pressed={active}
             className={[
-              'min-h-7 cursor-pointer rounded-[0.25rem] px-2.5 py-1 text-[0.625rem] font-medium uppercase leading-none tracking-[0.07em] transition-colors',
+              'min-h-6 cursor-pointer rounded-[0.25rem] px-2.5 py-1 text-[0.6875rem] font-normal leading-none transition-colors',
               active
-                ? 'bg-[var(--surface-raised)] text-accent shadow-soft'
+                ? 'bg-[var(--surface-raised)] text-txt shadow-soft'
                 : 'text-txt3 hover:text-txt',
             ].join(' ')}
           >
@@ -103,17 +104,30 @@ export function Figure({
   loading: boolean;
   size?: 'lg' | 'sm';
 }) {
-  // Instrument Serif on the KPI figure only. It reads as Crescent without
-  // turning the whole surface into a marketing page — everything else, and all
-  // tabular columns, stay mono or sans.
   const cls =
     size === 'lg'
-      ? 'display text-[1.875rem] leading-[1.075]'
+      ? 'display text-[1.75rem] leading-[1.15]'
       : 'num text-base font-medium leading-[1.15] tracking-tighter';
   if (loading) {
     return <Skeleton className={size === 'lg' ? 'h-[2.0125rem] w-32' : 'h-[1.15rem] w-20'} />;
   }
-  return <div className={cls}>{value ?? '—'}</div>;
+  if (value === null) return <div className={cls}>—</div>;
+
+  // Crescent writes the cents smaller and lighter than the dollars. Split on the
+  // last decimal point so "$66,705.00" renders as "$66,705" + ".00".
+  const m = size === 'lg' ? value.match(/^(.*)(\.\d{2})$/) : null;
+  return (
+    <div className={cls}>
+      {m ? (
+        <>
+          {m[1]}
+          <span className="cents">{m[2]}</span>
+        </>
+      ) : (
+        value
+      )}
+    </div>
+  );
 }
 
 /** Empty state. Explains WHY it is empty -- a bare "no data" reads as a bug. */

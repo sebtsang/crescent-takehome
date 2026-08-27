@@ -56,7 +56,7 @@ export function RangeHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="display truncate text-[1.6rem] leading-[1.1]">
+        <h1 className="display truncate text-[1.375rem] leading-[1.2]">
           {title}
         </h1>
         {/* Prints the requested window AND the dataset coverage, so an empty
@@ -136,7 +136,7 @@ function Kpi({
   loading: boolean;
 }) {
   return (
-    <div className="card px-4 py-3">
+    <div className="card px-5 py-4">
       <div className="eyebrow">{label}</div>
       <div className="mt-2">
         <Figure value={value} loading={loading} />
@@ -226,7 +226,7 @@ export function RecentDonationsCard({
             {recent.donations.map((d, i) => (
               <li
                 key={`${d.createdAt}-${i}`}
-                className="flex items-baseline justify-between gap-3 border-b border-line px-4 py-2 last:border-0"
+                className="flex items-baseline justify-between gap-3 border-b border-line/70 px-5 py-2.5 last:border-0"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm text-txt">

@@ -10,7 +10,7 @@ export type Bucket = {
   donationCount: number;
 };
 
-const CHART_H = 176;
+const CHART_H = 148;
 
 /**
  * Bars, not a line -- on purpose.
@@ -36,7 +36,7 @@ export function BarChart({
 
   if (loading) {
     return (
-      <div className="px-4 pb-4 pt-3">
+      <div className="px-5 pb-5 pt-1">
         <div className="mb-2 flex h-4 items-center">
           <Skeleton className="h-3 w-40" />
         </div>
@@ -58,7 +58,7 @@ export function BarChart({
   const lines = hasMoney ? [0, 1, 2].map((i) => axisMax - (axisMax / 2) * i) : [0];
 
   return (
-    <div className="px-4 pb-4 pt-3">
+    <div className="px-5 pb-5 pt-1">
       {/* Readout lives here rather than in a floating tooltip: fixed height, so
           hovering never nudges the layout. */}
       <div className="mb-2 flex h-4 items-center gap-3 text-[0.6875rem] leading-none">
@@ -93,7 +93,7 @@ export function BarChart({
 
         <div
           className="absolute inset-y-0 right-0 flex items-end"
-          style={{ left: '3.5rem', gap: rows.length > 60 ? 1 : rows.length > 20 ? 2 : 4 }}
+          style={{ left: '3.5rem', gap: rows.length > 60 ? 1 : rows.length > 24 ? 3 : rows.length > 10 ? 8 : 18 }}
           onMouseLeave={() => setHovered(null)}
         >
           {rows.map((b, i) => {
@@ -109,7 +109,7 @@ export function BarChart({
               >
                 <span
                   className={`absolute inset-x-0 bottom-0 block rounded-t-[2px] transition-colors ${
-                    hovered === i ? 'bg-[var(--accent-hover)]' : 'bg-bar'
+                    hovered === i ? 'bg-[var(--bar-hover)]' : 'bg-bar'
                   }`}
                   // min 1px keeps an empty bucket visible as a baseline tick
                   // rather than vanishing, so gaps read as "zero", not "missing".

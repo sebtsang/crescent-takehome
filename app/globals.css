@@ -14,6 +14,10 @@
  * What is deliberately NOT ported: the marketing page's oversized display type,
  * hero rhythm and generous vertical air. This is read at arm's length across
  * hundreds of rows, so density stays closer to a ledger than a landing page.
+ *
+ * Light only. Crescent's own site is light-only, and `color-scheme: light` below
+ * tells the browser so -- form controls and scrollbars stay light even for a
+ * viewer whose OS is set to dark.
  */
 :root {
   color-scheme: light;
@@ -24,11 +28,13 @@
   --purple-400: #ac7cf2;
   --purple-500: #efebfc;
 
-  --bg: #f8f7f4;
-  --surface: #f2f0ed;
+  /* The product sits on near-white, not beige. Cards are the same value as the
+     page and are separated by whitespace rather than by boxes. */
+  --bg: #fafaf9;
+  --surface: #f4f4f2;
   --surface-raised: #ffffff;
-  --border: #e3ded6;
-  --border-strong: #d5d5d5;
+  --border: #eceae7;
+  --border-strong: #dcd9d4;
 
   --txt: #1a1a1a;
   --txt2: #605c56;
@@ -39,9 +45,12 @@
   --accent-soft: #efebfc;
 
   /* Dashboard states the marketing site never needed */
-  --grid: #e8e4dd;
-  --bar: #9c6ce8;
-  --bar-muted: #e6dcf7;
+  --grid: #edebe8;
+  /* Chart fills are much lighter than the accent: in the product the saturated
+     purple is one button and a thin line, never a wall of colour. */
+  --bar: #c4a9f0;
+  --bar-hover: #8345dd;
+  --bar-muted: #eeeaf6;
   --warn: #8a6d1f;
   --danger: #8a2f2f;
 
@@ -49,58 +58,6 @@
   --shadow-sm: 0 1px 2px #807f7414, 0 1px 1px #4c4b460a;
   --shadow: 0 12px 12px -6px #807f740f, 0 6px 6px -3px #4c4b460d,
     0 3px 3px -1.5px #4c4b460f;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-
-    /* Derived from --purple-100 #32175a and --ebony #2b2c40 */
-    --bg: #14111c;
-    --surface: #1c1826;
-    --surface-raised: #231e2f;
-    --border: #322b40;
-    --border-strong: #423a52;
-
-    --txt: #f4f2f7;
-    --txt2: #aca4bb;
-    --txt3: #7f7791;
-
-    --accent: #ac7cf2;
-    --accent-hover: #c3a1f7;
-    --accent-soft: #2a2038;
-
-    --grid: #2a2338;
-    --bar: #7d4fd0;
-    --bar-muted: #302840;
-    --warn: #c9a94e;
-    --danger: #c97b7b;
-
-    --shadow-sm: 0 1px 2px #00000040;
-    --shadow: 0 12px 12px -6px #00000033, 0 6px 6px -3px #00000026;
-  }
-}
-
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #14111c;
-  --surface: #1c1826;
-  --surface-raised: #231e2f;
-  --border: #322b40;
-  --border-strong: #423a52;
-  --txt: #f4f2f7;
-  --txt2: #aca4bb;
-  --txt3: #7f7791;
-  --accent: #ac7cf2;
-  --accent-hover: #c3a1f7;
-  --accent-soft: #2a2038;
-  --grid: #2a2338;
-  --bar: #7d4fd0;
-  --bar-muted: #302840;
-  --warn: #c9a94e;
-  --danger: #c97b7b;
-  --shadow-sm: 0 1px 2px #00000040;
-  --shadow: 0 12px 12px -6px #00000033, 0 6px 6px -3px #00000026;
 }
 
 html,
@@ -123,24 +80,41 @@ body {
 }
 
 @layer components {
-  /* Small uppercase label. Crescent runs light — 500 is as heavy as it gets. */
+  /* The product labels sections in small sentence-case grey — "Total Balance",
+     "Money In" — not uppercase tracked eyebrows. */
   .eyebrow {
-    @apply text-[0.6875rem] font-medium uppercase tracking-[0.07em];
+    @apply text-[0.75rem] font-normal;
     color: var(--txt3);
+    letter-spacing: 0;
   }
 
+  /* Section heading inside a card: near-black, medium, sentence case. */
+  .section-title {
+    @apply text-[0.9375rem] font-medium;
+    color: var(--txt);
+    letter-spacing: -0.011em;
+  }
+
+  /* Crescent writes cents smaller and lighter than the dollars. */
+  .cents {
+    font-size: 0.62em;
+    color: var(--txt2);
+    font-weight: 400;
+  }
+
+  /* Flat. The product has no card shadows and only the faintest hairline; the
+     separation comes from whitespace. */
   .card {
     background: var(--surface-raised);
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    box-shadow: var(--shadow-sm);
+    border-radius: 0.625rem;
   }
 
-  /* Display face, used sparingly — page titles and the headline figure only. */
+  /* Figures and page titles: sans, medium, tight. The product uses no serif. */
   .display {
-    font-family: var(--font-display), Georgia, serif;
-    font-weight: 400;
-    letter-spacing: -0.02em;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
   }
 
   .num {

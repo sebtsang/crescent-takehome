@@ -51,15 +51,15 @@ function CampaignBreakdownCard({ scope }: { scope: Scope }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line">
-                <th className="eyebrow px-4 py-2 text-left font-semibold">Campaign</th>
-                <th className="eyebrow px-4 py-2 text-right font-semibold">Raised</th>
-                <th className="eyebrow px-4 py-2 text-right font-semibold">Goal</th>
+                <th className="px-5 py-2 text-left text-[0.6875rem] font-normal text-txt3">Campaign</th>
+                <th className="px-5 py-2 text-right text-[0.6875rem] font-normal text-txt3">Raised</th>
+                <th className="px-5 py-2 text-right text-[0.6875rem] font-normal text-txt3">Goal</th>
               </tr>
             </thead>
             <tbody>
               {breakdown.groups.map((g) => (
-                <tr key={g.key} className="border-b border-line last:border-0">
-                  <td className="px-4 py-2.5">
+                <tr key={g.key} className="border-b border-line/70 last:border-0">
+                  <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/dashboard/campaigns/${g.key}`}
@@ -75,13 +75,13 @@ function CampaignBreakdownCard({ scope }: { scope: Scope }) {
                       {g.donationCount} gifts · {g.uniqueDonorCount} donors
                     </div>
                   </td>
-                  <td className="num px-4 py-2.5 text-right align-top font-medium">
+                  <td className="num px-5 py-3 text-right align-top font-medium">
                     {g.raised.formatted}
                     <div className="num mt-0.5 text-[0.6875rem] font-normal text-txt3">
                       {g.shareOfTotalPct === null ? '—' : `${g.shareOfTotalPct}%`}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-right align-top">
+                  <td className="px-5 py-3 text-right align-top">
                     <GoalCell pct={g.lifetimeGoalProgressPct ?? null} goal={g.goal?.formatted} />
                   </td>
                 </tr>

@@ -57,7 +57,7 @@ export function Assistant() {
     <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="display text-[1.6rem] leading-[1.1]">
+          <h1 className="display text-[1.375rem] leading-[1.2]">
             Assistant
           </h1>
           <p className="mt-1 text-xs leading-none text-txt3">
@@ -70,7 +70,7 @@ export function Assistant() {
             setThreadId(null);
             setInput('');
           }}
-          className="min-h-7 cursor-pointer rounded-[0.375rem] border border-line px-2.5 py-1 text-[0.625rem] font-medium uppercase leading-none tracking-[0.07em] text-txt3 transition-colors hover:border-line-strong hover:text-txt"
+          className="min-h-8 cursor-pointer rounded-[0.375rem] border border-line px-3 text-[0.8125rem] font-normal leading-none text-txt2 transition-colors hover:border-line-strong hover:text-txt"
         >
           New conversation
         </button>
@@ -118,7 +118,7 @@ export function Assistant() {
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              className="min-h-7 cursor-pointer rounded-[0.375rem] bg-accent px-3.5 py-1.5 text-[0.625rem] font-medium uppercase leading-none tracking-[0.07em] text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-8 cursor-pointer rounded-[0.375rem] bg-accent px-3.5 text-[0.8125rem] font-medium leading-none text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               Ask
             </button>

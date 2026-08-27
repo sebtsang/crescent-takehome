@@ -46,7 +46,7 @@ export function Donors() {
     <div className="flex flex-col gap-3">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="display text-[1.6rem] leading-[1.1]">Donors</h1>
+          <h1 className="display text-[1.375rem] leading-[1.2]">Donors</h1>
           <div className="mt-1 flex h-3 items-center text-xs leading-none text-txt3">
             {loading ? (
               <Skeleton className="h-3 w-48" />
@@ -77,7 +77,7 @@ export function Donors() {
             aria-label="Search donors"
             className="min-w-0 flex-1 rounded-[0.375rem] border border-line bg-[var(--bg)] px-2.5 py-1.5 text-sm text-txt placeholder:text-txt3"
           />
-          <label className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-txt3">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[0.8125rem] font-normal text-txt2">
             <input
               type="checkbox"
               checked={repeatOnly}
@@ -104,16 +104,16 @@ export function Donors() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line">
-                  <th className="eyebrow px-4 py-2 text-left font-semibold">Donor</th>
-                  <th className="eyebrow px-4 py-2 text-right font-semibold">Total</th>
-                  <th className="eyebrow px-4 py-2 text-right font-semibold">Gifts</th>
-                  <th className="eyebrow px-4 py-2 text-right font-semibold">Last gift</th>
+                  <th className="px-5 py-2 text-left text-[0.6875rem] font-normal text-txt3">Donor</th>
+                  <th className="px-5 py-2 text-right text-[0.6875rem] font-normal text-txt3">Total</th>
+                  <th className="px-5 py-2 text-right text-[0.6875rem] font-normal text-txt3">Gifts</th>
+                  <th className="px-5 py-2 text-right text-[0.6875rem] font-normal text-txt3">Last gift</th>
                 </tr>
               </thead>
               <tbody>
                 {result.donors.map((d) => (
-                  <tr key={d.email} className="border-b border-line last:border-0">
-                    <td className="max-w-0 px-4 py-2.5">
+                  <tr key={d.email} className="border-b border-line/70 last:border-0">
+                    <td className="max-w-0 px-5 py-3">
                       <div className="truncate text-txt">
                         {d.isAnonymous ? (
                           <span className="italic text-txt3">{d.displayName}</span>
@@ -127,14 +127,14 @@ export function Donors() {
                         {d.campaignCount > 1 && ` · ${d.campaignCount} campaigns`}
                       </div>
                     </td>
-                    <td className="num px-4 py-2.5 text-right align-top font-medium">
+                    <td className="num px-5 py-3 text-right align-top font-medium">
                       {d.lifetime.formatted}
                       <div className="num mt-0.5 text-[0.6875rem] font-normal text-txt3">
                         {d.averageGift?.formatted ?? '—'} avg
                       </div>
                     </td>
-                    <td className="num px-4 py-2.5 text-right align-top">{d.giftCount}</td>
-                    <td className="num px-4 py-2.5 text-right align-top text-txt2">
+                    <td className="num px-5 py-3 text-right align-top">{d.giftCount}</td>
+                    <td className="num px-5 py-3 text-right align-top text-txt2">
                       {d.lastGiftISO.slice(0, 10)}
                       <div className="num mt-0.5 text-[0.6875rem] text-txt3">
                         first {d.firstGiftISO.slice(0, 10)}

@@ -88,7 +88,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       <div>
         <Link
           href="/dashboard"
-          className="text-[0.6875rem] font-medium uppercase tracking-[0.07em] text-txt3 transition-colors hover:text-accent"
+          className="text-[0.8125rem] font-normal text-txt2 transition-colors hover:text-txt"
         >
           ← Overview
         </Link>
@@ -129,7 +129,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               </div>
             ) : (
               <>
-                <div className="display text-[1.875rem] leading-none">
+                <div className="display text-[1.75rem] leading-none">
                   {group?.lifetimeGoalProgressPct ?? 0}%
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-bar-muted">
